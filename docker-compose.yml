@@ -1,0 +1,8 @@
+services:
+  benchmark:
+    build: .
+    volumes:
+      - ./data:/app/data
+      - ./results:/app/results
+      - ./paper/figures:/app/paper/figures
+    command: ["corridor-benchmark", "--seeds", "20"]

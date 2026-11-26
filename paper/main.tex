@@ -1,0 +1,115 @@
+\documentclass[journal]{IEEEtran}
+\usepackage{cite}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{etoolbox}
+
+\makeatletter
+\patchcmd{\abstract}{\textit{\abstractname}---\relax}{\textit{\abstractname}:\relax}{}{\PackageError{CorridorAIOps-RCA}{Could not set the abstract label separator}{Check the IEEEtran abstract definition}}
+\patchcmd{\IEEEkeywords}{\textit{\IEEEkeywordsname}---\relax}{\textit{\IEEEkeywordsname}:\relax}{}{\PackageError{CorridorAIOps-RCA}{Could not set the index-terms label separator}{Check the IEEEtran keyword definition}}
+\makeatother
+
+\title{A Reproducible Evaluation of Data-Driven Anomaly Scoring for Traffic-Corridor Telemetry}
+\author{Faysal A. Chowdhoury%
+\thanks{Faysal A. Chowdhoury is with the Department of Civil Engineering Technology, Environmental Management and Safety, Rochester Institute of Technology, Rochester, NY, USA.}}
+
+\begin{document}
+\maketitle
+\bstctlcite{NoRepeatedAuthorDash}
+
+\begin{abstract}
+Traffic operations depend on distributed detector, connected-vehicle, signal, and incident data, yet public datasets rarely provide synchronized field labels for cyber-physical root-cause evaluation. This paper presents CorridorAIOps-RCA, a reproducible data-ingestion and event-validation prototype, and reports a deliberately bounded benchmark on the published VeReMi NextGen highway 2 traces. The official training, validation, and test partitions contain 92,991, 44,098, and 104,977 messages, respectively. Three anomaly baselines were fitted on benign training records, and alert thresholds were selected from benign validation records. On the official test split, isolation forest achieved F1 0.369 and AUROC 0.491, one-class SVM achieved F1 0.483 and AUROC 0.525, and robust threshold rules achieved F1 0.377 and AUROC 0.496. The one-class SVM marked 99.98\% of non-malicious test messages as anomalous at its selected threshold. These near-chance ranking scores and high false-alarm rates do not support operational cyber-detection claims. Twenty overlapping, stratified test subsamples are descriptive repeats, not independent corridor-days. Separately acquired USDOT Tampa, PeMS-BAY, Caltrans, CISA, and MITRE data are documented but are not fused into this benchmark. Trained sequence models, SHAP explanations, causal root-cause accuracy, work-zone false-alarm rates, and mean time to detect remain unevaluated.
+\end{abstract}
+
+\begin{IEEEkeywords}
+traffic operations, anomaly detection, connected vehicles, event streaming, reproducibility, misbehavior detection
+\end{IEEEkeywords}
+
+\section{Introduction}
+Traffic management systems observe roadway detectors, connected vehicles, roadside units (RSUs), signal controllers, and operator reports as asynchronous data streams. A useful observability system must validate source records, preserve provenance, and distinguish abnormal messages from non-malicious variation. This is a data engineering and statistical evaluation problem. CorridorAIOps-RCA therefore treats the corridor as a distributed event stream and does not use traffic-physics equations or car-following models.
+
+The public evidence available for this prototype does not support a field evaluation of causal root-cause localization. We instead make the narrower, testable contribution of an acquisition and parsing workflow and an official-split benchmark on VeReMi NextGen, a labeled vehicular-network misbehavior dataset \cite{veremi2026}. We additionally acquire samples of Tampa CV Pilot BSM and SPaT data \cite{tampabsm2019,tampaspat2019}, a PeMS-BAY detector file \cite{pemsbay2022}, current Caltrans lane-closure records \cite{caltranslcs}, and public CISA and MITRE threat-intelligence feeds \cite{cisakev,mitreics}. These sources are not synchronized and are not represented as a single multimodal training corpus.
+
+This study makes three evidence-bounded contributions. First, it documents checksum-verified acquisition and parsers for published records. Second, it evaluates isolation forest, one-class SVM, and robust threshold rules without modifying the published VeReMi labels or split boundaries. Third, it reports weak test performance and explicitly identifies unmeasured outcomes. No custom traffic or attack records are generated. No trained Transformer, LSTM, SHAP attribution, causal-discovery analysis, or field root-cause evaluation is claimed.
+
+\section{Related Work}
+Data-driven traffic prediction models learn temporal and spatial patterns from detector observations, including the PeMS-BAY benchmark \cite{li2018dcrnn}. Such predictive performance is distinct from identifying malicious messages or localizing an operational root cause. Transformer architectures provide general sequence-modeling tools \cite{vaswani2017attention}, while SHAP provides a framework for attributing model predictions to input features \cite{lundberg2017shap}. Neither attention weights nor feature attributions alone establish causal responsibility.
+
+Transportation studies that apply Transformers or SHAP to prepared crash-severity labels address static outcome classification and post-hoc interpretation. Streaming AIOps asks a different question: whether a sequence of live device and controller events is abnormal, and whether the responsible component can be validated against incident ground truth. This work does not claim to solve that broader problem. It reports anomaly scores on an existing, labeled misbehavior dataset and does not infer a corridor intervention or physical root cause.
+
+Isolation forest detects observations that are isolated by random partitioning \cite{liu2008isolation}. One-class support vector machines estimate a boundary around nominal examples \cite{scholkopf2001estimating}. These methods are appropriate transparent baselines for a small tabular feature representation, but their behavior depends on feature construction, training population, and alert threshold. The present comparison measures that behavior on VeReMi NextGen and makes no generalization claim to field RSU logs.
+
+\section{System Architecture and Public-Data Pipeline}
+The software separates acquisition, parsing, typed event validation, replay adapters, scoring, and reporting. The Pydantic event schema records a UTC-aware timestamp, corridor and source identifiers, event kind, numeric metrics, optional text, and an optional dataset label. An asynchronous bounded queue provides producer-consumer backpressure. Read-only adapters parse Vissim FZP/LSA exports, SUMO FCD/TLS output, and CARLA or ROS 2 JSON Lines. These are adapters, not claims of live simulator integration.
+
+The acquisition run retrieved the two selected VeReMi NextGen highway 2 archives and the official split-specific ground-truth files. Archive checksums were verified against Zenodo metadata. The parser reads records within nested split archives and preserves the official train, validation, or test location and attacker label. USDOT sample queries returned 1,000 BSM and 1,000 SPaT records. Additional downloads included a PeMS-BAY District 4 station file for 2022-01-01, three current District 4 Alameda US-80 planned-closure records, 1,805 CISA KEV entries, and 2,570 MITRE ATT\&CK for ICS objects. A local manifest records acquisition URLs, byte sizes, record checks where available, and SHA-256 digests.
+
+The Tampa BSM and SPaT records are real public pilot samples, but they are neither synchronized to each other in the acquired windows nor aligned with the historical PeMS file or VeReMi labels. The Caltrans closures are current planned records, not contemporaneous labels for the VeReMi messages. Consequently, these sources support ingestion and format validation only. The reported benchmark uses VeReMi alone. Raw records are not redistributed with the software.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=0.98\textwidth]{figures/fig1_architecture.pdf}
+\caption{Data acquisition, validation, replay, and scoring components. Public sources remain separate; benchmark metrics in this paper are computed only on the official VeReMi NextGen split.}
+\label{fig:architecture}
+\end{figure*}
+
+\section{Anomaly Scoring and Evaluation Method}
+Each VeReMi record is represented by six sender fields: speed, acceleration, heading, and three position coordinates. The published attacker label is mapped to non-malicious (\texttt{attacker=0}) or misbehavior (\texttt{attacker=1}); it is not interpreted as a label for a field cyber intrusion. The current parser maps absent numeric fields to zero, while non-numeric present fields raise an error. This default can conflate missingness with a true zero and is a limitation of the current feature representation.
+
+All three baselines use the official training split, with the robust location and scale fitted only on its non-malicious records. Isolation forest and one-class SVM are fitted to the robustly scaled training records. A transparent rule score uses absolute deviations from robustly scaled features. For each scorer, the alert threshold is the 95th percentile of scores on non-malicious validation records. No threshold is selected from the test split.
+
+The primary metrics are test-split F1 and AUROC. The false-alarm rate is the fraction of non-malicious VeReMi test records whose score exceeds the validation threshold. It is not a work-zone FAR. Average precision and batch-scoring time per record are also recorded. The score-time measurement uses a vectorized batch call on one local environment and is not an end-to-end online latency or a production SLA.
+
+For descriptive stability, the runner creates 20 deterministic, class-stratified subsamples, each containing 80\% of each test class without replacement. These subsamples overlap substantially and are not independent replications. The 95\% intervals reported for full-split metrics use 1,000 record-level bootstrap resamples. They quantify record-sampling uncertainty under an exchangeability assumption, not between-corridor or between-day uncertainty. The runner does not report paired confidence intervals for model-to-model metric differences.
+
+\section{Experimental Results}
+The official VeReMi counts were 92,991 training, 44,098 validation, and 104,977 test records. The test split contains 71,582 non-malicious and 33,395 misbehavior-labeled messages. On this split, isolation forest achieved F1 0.369 (record-bootstrap 95\% interval 0.365--0.373) and AUROC 0.491 (0.488--0.495). One-class SVM achieved F1 0.483 (0.479--0.486) and AUROC 0.525 (0.521--0.528), but its false-alarm rate on non-malicious test records was 99.98\%. Robust rules achieved F1 0.377 (0.373--0.382) and AUROC 0.496 (0.492--0.499). The one-class SVM's higher F1 at this validation threshold comes with an unusably high false-alarm rate. All three AUROC values are close to chance-level ranking.
+
+Table~\ref{tab:benchmark} lists the complete-split metrics. These results do not demonstrate reliable attack discrimination. The latency column is batch scoring time divided by record count, and must not be interpreted as measured streaming latency.
+
+\begin{table}[!t]
+\centering
+\caption{Full official test-split results. FAR is measured on non-malicious VeReMi records, not on work zones.}
+\label{tab:benchmark}
+\input{../results/results_table.tex}
+\end{table}
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=0.98\textwidth]{figures/fig2_detection_roc_pr.pdf}
+\caption{ROC and precision-recall curves on the official VeReMi test split for the three implemented baselines. No trained Transformer or LSTM result is available.}
+\label{fig:curves}
+\end{figure*}
+
+The subsample summaries in Fig.~\ref{fig:subsamples} show little variation because the partitions repeatedly draw from one fixed official test split. Their narrow ranges do not imply independent-corridor reproducibility. Work-zone FAR, mean time to detect, top-1 or top-3 root-cause accuracy, and paired model-difference confidence intervals are unreported because the available records do not supply the required synchronized work-zone labels, incident onset times, causal-node ground truth, or independent sampling units.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{figures/fig3_workzone_false_alarms.pdf}
+\caption{False-alarm rate on non-malicious VeReMi records and cyber/misbehavior F1 across 20 overlapping test subsamples. Caltrans work-zone FAR is not evaluated.}
+\label{fig:subsamples}
+\end{figure}
+
+Fig.~\ref{fig:features} shows absolute differences between class means after scaling by the training non-malicious median absolute deviation. This is a descriptive feature-separation plot. It is neither SHAP, a model explanation, nor causal evidence.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/fig4_shap_causal_attribution.pdf}
+\caption{Descriptive standardized feature separation between published attacker-label groups. The values do not identify causal features or root-cause nodes.}
+\label{fig:features}
+\end{figure*}
+
+\section{Discussion and Deployment Implications}
+The benchmark exposes a gap between a reproducible parsing and scoring pipeline and a defensible operational monitor. Near-chance AUROC and high non-malicious false-alarm rates indicate that these six features and fitted baselines are inadequate for the tested labels. A tuned threshold could alter the F1 and false-alarm tradeoff, but it would not supply missing incident semantics or causal ground truth. The correct interpretation is a negative benchmark result, not a basis for deployment.
+
+PyTorch Transformer and LSTM modules in the repository are architectural scaffolding and have no trained checkpoint or reported test score. The event-source deviation ranker is a diagnostic heuristic, not a structural causal model, PC algorithm, Granger analysis, or root-cause estimator. No tokenized controller-log corpus was acquired, so multimodal text fusion and SHAP attribution are not evaluated. The figure with feature differences must not be used as evidence for those methods.
+
+A credible follow-up requires synchronized, rights-cleared BSM, SPaT, detector, RSU, and controller logs from multiple corridors and dates; incident onset and component-level root-cause labels; explicit separation of development and temporal holdout data; and cluster-aware uncertainty estimates. It also requires trained model comparisons, calibration analysis, operational noise labels, and event-by-event latency measurement under a documented workload. The current public sources do not meet those conditions.
+
+\section{Conclusion}
+CorridorAIOps-RCA provides reproducible acquisition, schema validation, replay adapters, and a benchmark on official VeReMi NextGen splits. The evaluated baselines produced AUROC values from 0.491 to 0.525 and false-alarm rates that preclude an operational claim. The 20 subsamples are overlapping views of a single test split, and separately acquired traffic, signal, closure, and threat feeds were not fused. Trained deep models, SHAP explanations, causal localization, work-zone FAR, MTTD, and field performance remain open evaluation tasks. These limits are central to interpreting the result and planning further research.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+\end{document}

@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "CorridorAIOps-RCA"
+abstract: "A data-driven streaming observability and reproducible anomaly-scoring prototype for traffic corridors."
+authors:
+  - family-names: Chowdhoury
+    given-names: "Faysal A."
+    affiliation: "Rochester Institute of Technology"
+version: 0.1.0
+date-released: 2026-11-26
+license: MIT
+repository-code: "https://github.com/faysalchowdhoury/corridor-aiops-rca"
