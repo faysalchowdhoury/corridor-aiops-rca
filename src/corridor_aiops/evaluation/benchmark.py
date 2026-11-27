@@ -38,6 +38,7 @@ from sklearn.metrics import (
 )
 from sklearn.svm import OneClassSVM
 
+from corridor_aiops.data.audit import heldout_scenario_status
 from corridor_aiops.data.parse import veremi_archive_identity, veremi_events
 from corridor_aiops.data.trajectory import (
     CAUSAL_JITTER_DEFINITION,
@@ -71,7 +72,13 @@ SUPERVISED_MODELS = (
     "tabular_transformer",
 )
 REFERENCE_MODEL = "tabular_transformer"
+# One-class controls on the same flattened L = 10 window and masks as the supervised
+# baselines; reported only in the ablation summary so the 9-model schema is unchanged.
+ONE_CLASS_L10_MODELS = ("isolation_forest_L10", "one_class_svm_L10")
+ONE_CLASS_FIT_CAP = 10_000
 DISPLAY_NAMES = {
+    "isolation_forest_L10": "Isolation forest ($L=10$)",
+    "one_class_svm_L10": "One-class SVM ($L=10$)",
     "robust_threshold_rules": "Robust rules",
     "isolation_forest": "Isolation forest",
     "one_class_svm": "One-class SVM",
@@ -105,7 +112,7 @@ def _xgboost_available() -> bool:
 
 
 def regime(model: str) -> str:
-    if model in UNSUPERVISED_MODELS:
+    if model in UNSUPERVISED_MODELS or model in ONE_CLASS_L10_MODELS:
         return "unsupervised_or_one_class"
     if model in SUPERVISED_MODELS:
         return "supervised"
@@ -377,29 +384,38 @@ def fit_model(
             "training_records": int(len(benign_train)),
             "checkpoint_sha256": hashlib.sha256(b"robust_threshold_rules:3.0").hexdigest(),
         }
-    elif name in {"isolation_forest", "one_class_svm"}:
+    elif name in {"isolation_forest", "one_class_svm", *ONE_CLASS_L10_MODELS}:
+        windowed = name in ONE_CLASS_L10_MODELS
+        base = name.removesuffix("_L10")
+        features = representation.flat if windowed else representation.last_step
         fit_rows = benign_train
-        if name == "one_class_svm" and len(fit_rows) > 10_000:
-            fit_rows = np.sort(np.random.default_rng(seed).choice(fit_rows, 10_000, replace=False))
+        if base == "one_class_svm" and len(fit_rows) > ONE_CLASS_FIT_CAP:
+            fit_rows = np.sort(
+                np.random.default_rng(seed).choice(fit_rows, ONE_CLASS_FIT_CAP, replace=False)
+            )
         model = (
             IsolationForest(random_state=seed, n_estimators=100, contamination="auto", n_jobs=-1)
-            if name == "isolation_forest"
+            if base == "isolation_forest"
             else OneClassSVM(gamma="scale", nu=0.05)
         )
         started = time.perf_counter()
-        model.fit(representation.last_step(fit_rows))
+        model.fit(features(fit_rows))
         training_seconds = time.perf_counter() - started
-        scorer = model.score_samples if name == "isolation_forest" else model.decision_function
-        validation_scores = -np.asarray(scorer(representation.last_step(validation))).reshape(-1)
+        scorer = model.score_samples if base == "isolation_forest" else model.decision_function
+        validation_scores = -np.asarray(scorer(features(validation))).reshape(-1)
         test_scores, inference = _timed_scores(
-            lambda matrix: -np.asarray(scorer(matrix)), representation.last_step(test)
+            lambda matrix: -np.asarray(scorer(matrix)), features(test)
         )
         result = {
             "validation_scores": validation_scores,
             "test_scores": test_scores,
             "inference_ms_per_event": inference,
             "training_seconds": training_seconds,
-            "training_status": "fit_on_non_malicious_training_records_current_step",
+            "training_status": (
+                "fit_on_non_malicious_training_records_flattened_L10_window_and_masks"
+                if windowed
+                else "fit_on_non_malicious_training_records_current_step"
+            ),
             "training_records": int(len(fit_rows)),
             "checkpoint_sha256": _pickle_sha256(model),
         }
@@ -561,6 +577,7 @@ def evaluate_operating_points(
         key = f"far_{budget * 100:.1f}pct"
         budget_threshold = far_budget_threshold(validation_scores[validation_labels == 0], budget)
         alerts = test_scores >= budget_threshold
+        metrics[f"validation_calibrated_threshold_at_{key}"] = budget_threshold
         metrics[f"test_roc_tpr_at_{key}"] = float(np.max(tpr[fpr <= budget + 1e-12]))
         metrics[f"validation_calibrated_recall_at_{key}"] = float(np.mean(alerts[positive]))
         metrics[f"validation_calibrated_realized_far_at_{key}"] = float(np.mean(alerts[~positive]))
@@ -672,12 +689,23 @@ def composite_cluster_codes(
 class _WeightedScorer:
     """Exact weighted F1, AUROC (ties count one half), and FAR for one score vector."""
 
-    def __init__(self, labels: np.ndarray, scores: np.ndarray, threshold: float) -> None:
+    def __init__(
+        self,
+        labels: np.ndarray,
+        scores: np.ndarray,
+        threshold: float,
+        extra_thresholds: dict[str, float] | None = None,
+    ) -> None:
         self.positive = labels.astype(float)
         self.negative = 1.0 - self.positive
         _, self.groups = np.unique(scores, return_inverse=True)
         self.group_count = int(self.groups.max()) + 1
         self.prediction = (scores >= threshold).astype(float)
+        # Fixed validation-calibrated FAR-budget thresholds: recall and realized FAR
+        # are re-estimated on every resample at these unchanged thresholds.
+        self.extra = {
+            key: (scores >= value).astype(float) for key, value in (extra_thresholds or {}).items()
+        }
 
     def __call__(self, weights: np.ndarray) -> dict[str, float] | None:
         positive_weight = weights * self.positive
@@ -697,11 +725,19 @@ class _WeightedScorer:
         false_positive = float(np.sum(negative_weight * self.prediction))
         false_negative = float(total_positive - true_positive)
         denominator = 2 * true_positive + false_positive + false_negative
-        return {
+        metrics = {
             "f1_cyber_vs_benign": 2 * true_positive / denominator if denominator else 0.0,
             "auroc": auroc,
             "false_alarm_rate_non_malicious": false_positive / float(total_negative),
         }
+        for key, prediction in self.extra.items():
+            metrics[f"validation_calibrated_recall_at_{key}"] = float(
+                np.sum(positive_weight * prediction) / total_positive
+            )
+            metrics[f"validation_calibrated_realized_far_at_{key}"] = float(
+                np.sum(negative_weight * prediction) / total_negative
+            )
+        return metrics
 
 
 def composite_cluster_bootstrap(
@@ -715,17 +751,20 @@ def composite_cluster_bootstrap(
     seed: int,
     samples: int,
     preview_rows: int = 0,
+    extra_thresholds: dict[str, dict[str, float]] | None = None,
 ) -> dict[str, Any]:
     """Paired nonparametric bootstrap over composite (corridor_id, source_id) clusters.
 
     Every model is scored on the same cluster resample. A replicate without both
     classes is skipped and counted. Paired differences are ``reference - model``.
+    ``extra_thresholds`` maps a model to fixed FAR-budget thresholds (keyed like
+    ``far_1.0pct``) whose recall and realized FAR are also resampled.
     """
     codes, cluster_count = composite_cluster_codes(corridor_ids, source_ids)
     if cluster_count < 2:
         raise ValueError("Sender-cluster bootstrap requires at least two composite clusters")
     scorers = {
-        name: _WeightedScorer(labels, scores, thresholds[name])
+        name: _WeightedScorer(labels, scores, thresholds[name], (extra_thresholds or {}).get(name))
         for name, scores in scores_by_model.items()
     }
     rng = np.random.default_rng(seed)
@@ -941,6 +980,74 @@ def sender_disjoint_partition(table: EventTable) -> tuple[dict[str, np.ndarray],
     }
 
 
+CHRONOLOGICAL_FRACTIONS = (0.6, 0.2, 0.2)
+
+
+def chronological_partition(
+    table: EventTable,
+) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
+    """Per-archive chronological 60/20/20 split on the simulator receive time.
+
+    Within each archive, messages are ordered by ``receive_time_ns``; cut points are
+    placed at timestamp values, so no timestamp is shared between partitions and every
+    train time precedes every validation time, which precedes every test time.
+    Trajectory windows are unchanged (they never cross an official split).
+    """
+    times = np.asarray([event.receive_time_ns for event in table.events], dtype=np.int64)
+    assignment = np.empty(len(times), dtype=object)
+    per_archive: dict[str, Any] = {}
+    for archive in sorted(set(table.archive.tolist())):
+        rows = table.rows(archive=archive)
+        ordered = np.sort(times[rows])
+        first = ordered[int(CHRONOLOGICAL_FRACTIONS[0] * len(ordered))]
+        second = ordered[
+            int((CHRONOLOGICAL_FRACTIONS[0] + CHRONOLOGICAL_FRACTIONS[1]) * len(ordered))
+        ]
+        local = times[rows]
+        assignment[rows] = np.where(
+            local < first, "train", np.where(local < second, "validation", "test")
+        )
+        parts = {split: local[assignment[rows] == split] for split in SPLITS}
+        empty = [split for split, values in parts.items() if values.size == 0]
+        if empty:
+            raise RuntimeError(
+                f"{archive} cannot be split chronologically without sharing a timestamp: "
+                f"empty partitions {empty}"
+            )
+        if not (parts["train"].max() < parts["validation"].min()) or not (
+            parts["validation"].max() < parts["test"].min()
+        ):
+            raise RuntimeError(f"Chronological partition overlaps in time for {archive}")
+        per_archive[archive] = {
+            "cut_seconds": [first / 1e9, second / 1e9],
+            "time_range_seconds": {
+                split: [float(values.min() / 1e9), float(values.max() / 1e9)]
+                for split, values in parts.items()
+            },
+            "records": {split: int(len(values)) for split, values in parts.items()},
+        }
+    split_rows = {split: np.flatnonzero(assignment == split) for split in SPLITS}
+    senders = {split: set(table.source[rows].tolist()) for split, rows in split_rows.items()}
+    return split_rows, {
+        "partition_rule": (
+            "within each archive, receive_time_ns < first cut -> train, < second cut -> "
+            "validation, otherwise test; cuts at the 60th and 80th percentile timestamps"
+        ),
+        "fractions": list(CHRONOLOGICAL_FRACTIONS),
+        "per_archive": per_archive,
+        "timestamp_overlap_between_partitions": 0,
+        "bare_source_id_train_test_overlap": len(senders["train"] & senders["test"]),
+        "temporal_note": (
+            "The official splits come from separately simulated periods whose simulator "
+            "clocks overlap, so each chronological partition pools messages from several "
+            "official splits. Windows remain computed from past messages of the same "
+            "official split, so a test window may include earlier messages that fall in "
+            "the training partition (history available at detection time); no window uses "
+            "future messages. Senders are not disjoint across partitions."
+        ),
+    }
+
+
 def _context_bootstrap(
     table: EventTable,
     split_rows: dict[str, np.ndarray],
@@ -953,6 +1060,15 @@ def _context_bootstrap(
     test = split_rows["test"]
     scores = {name: runs[0]["test_scores"] for name, runs in raw.items()}
     thresholds = {name: summaries[name]["per_seed"][0]["validation_f1_threshold"] for name in raw}
+    extra = {
+        name: {
+            f"far_{budget * 100:.1f}pct": summaries[name]["per_seed"][0][
+                f"validation_calibrated_threshold_at_far_{budget * 100:.1f}pct"
+            ]
+            for budget in FAR_BUDGETS
+        }
+        for name in raw
+    }
     result = composite_cluster_bootstrap(
         table.labels[test],
         table.corridor[test],
@@ -963,6 +1079,7 @@ def _context_bootstrap(
         seed=BOOTSTRAP_SEED,
         samples=samples,
         preview_rows=preview_rows,
+        extra_thresholds=extra,
     )
     result["scores_from_training_seed"] = summaries[next(iter(raw))]["per_seed"][0]["seed"]
     return result
@@ -1200,6 +1317,37 @@ def run_benchmark(
                 "composite_cluster_bootstrap": bootstrap,
             }
 
+        chrono_rows, chrono_meta = chronological_partition(table)
+        reason = split_eligibility(labels, chrono_rows)
+        if reason is not None:
+            generalization["chronological_holdout"] = {
+                "status": "NOT_EVALUABLE",
+                "reason": reason,
+                **chrono_meta,
+            }
+        else:
+            summary, raw, _ = run_models(
+                table,
+                chrono_rows,
+                models,
+                config=FULL_CONFIG,
+                seeds=seeds,
+                epochs=epochs,
+                label="chronological",
+            )
+            _log("chronological: bootstrap")
+            bootstrap = _context_bootstrap(
+                table, chrono_rows, raw, summary, samples=bootstrap_samples
+            )
+            bootstrap.pop("_preview_rows")
+            generalization["chronological_holdout"] = {
+                "status": "EVALUABLE",
+                **chrono_meta,
+                "class_counts": _split_counts(labels, chrono_rows),
+                "models": summary,
+                "composite_cluster_bootstrap": bootstrap,
+            }
+
     ablation_summary: dict[str, Any] | None = None
     if run_ablations:
         supervised_candidates = [
@@ -1246,7 +1394,48 @@ def run_benchmark(
                         if key in full_stats and key not in TIMING_KEYS
                     },
                 }
+        one_class_summary, _, _ = run_models(
+            table,
+            official,
+            list(ONE_CLASS_L10_MODELS),
+            config=FULL_CONFIG,
+            seeds=seeds,
+            epochs=epochs,
+            label="ablation one-class L10",
+        )
+        ablations["one_class_window_length"] = {
+            "variant": "one_class_flattened_L10",
+            "description": (
+                "Isolation forest and one-class SVM fit on the same flattened L = 10 window "
+                "and validity masks as the supervised baselines (one-class SVM on a seeded "
+                f"sample of at most {ONE_CLASS_FIT_CAP:,} non-malicious training records); "
+                "compared with their current-step (L = 1) versions in the main benchmark"
+            ),
+            "feature_names": list(FULL_CONFIG.feature_names),
+            "window_length": FULL_CONFIG.window,
+            "validity_masks": FULL_CONFIG.use_masks,
+            "models": {},
+        }
+        for name in ONE_CLASS_L10_MODELS:
+            base = name.removesuffix("_L10")
+            variant_stats = one_class_summary[name]["mean_std_across_training_seeds"]
+            full_stats = main_summary[base]["mean_std_across_training_seeds"]
+            ablations["one_class_window_length"]["models"][name] = {
+                "display_name": DISPLAY_NAMES[name],
+                "compared_with": base,
+                "per_seed": one_class_summary[name]["per_seed"],
+                "variant_mean_std_across_training_seeds": variant_stats,
+                "full_mean_std_across_training_seeds": {
+                    key: full_stats[key] for key in variant_stats if key in full_stats
+                },
+                "variant_minus_full_mean": {
+                    key: variant_stats[key]["mean"] - full_stats[key]["mean"]
+                    for key in variant_stats
+                    if key in full_stats and key not in TIMING_KEYS
+                },
+            }
         ablation_summary = {
+            "one_class_controls": list(ONE_CLASS_L10_MODELS),
             "protocol": (
                 "official train/validation/test splits; each variant changes one factor "
                 "relative to the full configuration; same training seeds; full-configuration "
@@ -1276,8 +1465,8 @@ def run_benchmark(
     manifest_path = Path(data_dir).parent / "manifest.json"
     summary = {
         "title": (
-            "Evidence-Limited Misbehavior Detection for Connected-Vehicle Telemetry Using "
-            "Causal Trajectory Features and Sender-Cluster Evaluation"
+            "Attack-Specific Misbehavior Detection in Connected-Vehicle Networks: A "
+            "Sender-Clustered Evaluation of Cross-Attack Generalization"
         ),
         "study_type": "VeReMi NextGen simulated misbehavior detection",
         "dataset": "VeReMi NextGen InTAS highway 2",
@@ -1365,8 +1554,10 @@ def run_benchmark(
             "dataset_attack_labels": "simulated VeReMi attacker/misbehavior labels",
             "attacker_emitter_localization": "sender-level risk ranking only",
             "simulated_mttd": "message-level simulator delay; not field-incident MTTD",
-            "independent_scenario_holdout": (
-                "NOT_EVALUABLE: both acquired archives use InTAS highway 2"
+            "independent_scenario_holdout": heldout_scenario_status(Path(data_dir).parent),
+            "attack_scope": (
+                "conclusions apply only to the two evaluated attack categories, dataReplay "
+                "and dosAttack"
             ),
             "work_zone_far": None,
             "causal_root_cause_accuracy": None,
@@ -1391,7 +1582,7 @@ def run_benchmark(
             "auroc",
             "false_alarm_rate_non_malicious",
         ]
-        writer = csv.DictWriter(stream, fieldnames=fields)
+        writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(preview)
     from corridor_aiops.evaluation.tables import write_tables
@@ -1424,6 +1615,9 @@ def _write_seed_csv(path: Path, summary: dict[str, Any]) -> None:
     holdout = summary["generalization"].get("sender_disjoint_holdout", {})
     if holdout.get("status") == "EVALUABLE":
         contexts.append(("sender_disjoint", holdout["models"]))
+    chronological = summary["generalization"].get("chronological_holdout", {})
+    if chronological.get("status") == "EVALUABLE":
+        contexts.append(("chronological", chronological["models"]))
     with path.open("w", encoding="utf-8", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()

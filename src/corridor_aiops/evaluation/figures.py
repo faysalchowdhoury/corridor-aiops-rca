@@ -400,7 +400,7 @@ def _architecture(figure_dir: Path, summary: dict[str, Any]) -> None:
         ),
         (
             "3",
-            "Causal representation",
+            "Past-only representation",
             [
                 "per-sender window, L = 10",
                 "11 translation-invariant",
@@ -491,7 +491,7 @@ def _architecture(figure_dir: Path, summary: dict[str, Any]) -> None:
     ax.text(
         0.005,
         0.615,
-        "(b) Supervised Tabular Transformer: causal masked encoder for one sender window",
+        "(b) Supervised Tabular Transformer: past-only (causal-mask) encoder for one sender window",
         fontsize=8.2,
         fontweight="bold",
         va="top",
@@ -843,16 +843,20 @@ def _contexts(summary: dict[str, Any]) -> list[tuple[str, dict[str, Any] | None,
             contexts.append((label, block["models"], None))
         else:
             contexts.append((label, None, block.get("reason")))
-    holdout = generalization.get("sender_disjoint_holdout")
-    if holdout:
-        evaluable = holdout["status"] == "EVALUABLE"
-        contexts.append(
-            (
-                "Sender-\ndisjoint",
-                holdout["models"] if evaluable else None,
-                None if evaluable else holdout.get("reason"),
+    for key, label in (
+        ("sender_disjoint_holdout", "Sender-\ndisjoint"),
+        ("chronological_holdout", "Chrono-\nlogical"),
+    ):
+        holdout = generalization.get(key)
+        if holdout:
+            evaluable = holdout["status"] == "EVALUABLE"
+            contexts.append(
+                (
+                    label,
+                    holdout["models"] if evaluable else None,
+                    None if evaluable else holdout.get("reason"),
+                )
             )
-        )
     return contexts
 
 
@@ -1023,7 +1027,14 @@ def _ablation_and_robustness(
     fig, axes = plt.subplots(2, 2, figsize=(7.16, 5.0))
     model_styles = {}
     if ablation:
-        families = list(ablation["ablations"])
+        # Panels (a, b) compare the Transformer and the top baseline; the one-class
+        # L = 10 control block has neither and is reported in the ablation table.
+        shown = set(ablation["models"])
+        families = [
+            family
+            for family, block in ablation["ablations"].items()
+            if shown <= set(block["models"])
+        ]
         models = ablation["models"]
         for name in models:
             model_styles[name] = (

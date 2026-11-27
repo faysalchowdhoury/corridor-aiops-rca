@@ -1,0 +1,20 @@
+\begin{tabular}{lcccccccc}
+\toprule
+& \multicolumn{2}{c}{Max-F1} & \multicolumn{2}{c}{Youden $J$} & \multicolumn{2}{c}{FAR budget 1\%} & \multicolumn{2}{c}{FAR budget 5\%} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}
+Model & Recall & FAR (\%) & Recall & FAR (\%) & Recall & FAR (\%) & Recall & FAR (\%) \\
+\midrule
+\multicolumn{9}{l}{\textit{Unsupervised / one-class (fit on non-malicious records)}} \\
+Robust rules & 0.837 & 29.74 & 0.837 & 29.74 & 0.013 & 0.40 & 0.090 & 2.14 \\
+Isolation forest & 0.858 & 31.17 & 0.858 & 31.39 & 0.013 & 1.91 & 0.159 & 6.96 \\
+One-class SVM & 0.789 & 2.76 & 0.790 & 2.85 & 0.783 & 2.60 & 0.803 & 8.24 \\
+LSTM autoencoder & 0.907 & 9.35 & 0.909 & 9.40 & 0.007 & 1.58 & 0.856 & 7.52 \\
+\midrule
+\multicolumn{9}{l}{\textit{Supervised (fit on training labels)}} \\
+Logistic regression & 0.909 & 3.04 & 0.935 & 5.70 & 0.909 & 3.10 & 0.949 & 8.91 \\
+Random forest & 0.935 & 1.93 & 0.956 & 3.98 & 0.934 & 1.90 & 0.981 & 9.96 \\
+Hist. gradient boosting & 0.938 & 2.39 & 0.942 & 2.79 & 0.943 & 2.89 & 0.975 & 8.30 \\
+Supervised MLP & 0.935 & 4.14 & 0.941 & 5.14 & 0.927 & 3.17 & 0.961 & 9.94 \\
+Tabular Transformer & 0.939 & 3.82 & 0.947 & 5.10 & 0.934 & 3.13 & 0.966 & 10.01 \\
+\bottomrule
+\end{tabular}

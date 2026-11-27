@@ -533,6 +533,34 @@ def confusion_diagnostics(
             context["models"][name] = _summarize_context(per_seed, subgroup_rows)
         contexts[f"pooled:{archive}"] = context
 
+    # the same pooled models under the single pooled validation-F1 threshold of each
+    # seed (no per-category re-selection), sliced per attack category
+    for archive in archives:
+        t_mask = table.archive[test] == archive
+        context = {
+            "protocol": (
+                "pooled official-split models and their single pooled validation-F1 "
+                "threshold; test restricted to this category"
+            ),
+            "test_class_counts": {
+                "attacker": int(labels[test][t_mask].sum()),
+                "non_malicious": int((labels[test][t_mask] == 0).sum()),
+            },
+            "models": {},
+        }
+        for name in models:
+            per_seed = []
+            subgroup_rows = []
+            for index, seed in enumerate(seeds):
+                threshold = _threshold(summary["models"], name, index)
+                t_scores = scores.get("official", name, seed, "test")[t_mask]
+                per_seed.append(confusion(labels[test][t_mask], t_scores, threshold))
+                subgroup_rows.append(
+                    _subgroups(labels[test][t_mask], outcomes[test][t_mask], t_scores, threshold)
+                )
+            context["models"][name] = _summarize_context(per_seed, subgroup_rows)
+        contexts[f"pooledthreshold:{archive}"] = context
+
     for direction in summary["generalization"]["leave_one_attack_type_out"]:
         key = f"loao:{direction}"
         validation = scores.rows(key, "validation")
@@ -602,6 +630,314 @@ def _summarize_context(
 # Tables and macros
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Cross-archive benign overlap and sender-disjoint deduplicated LOAO
+# ---------------------------------------------------------------------------
+
+DEDUP_SALT = "corridor-aiops-loao-sender-disjoint-v1"
+DEDUP_SOURCE_FRACTION = 0.5
+OVERLAP_LEVELS = (
+    "message_sender_messageID_sendTime",
+    "receive_time_sender_rcvTime",
+    "bare_source_id",
+    "trajectory_window_L10",
+)
+
+
+def _window_keys(table: EventTable, rows: np.ndarray) -> np.ndarray:
+    """Hash of the model-input L = 10 window (feature values and validity masks)."""
+    columns = [table.feature_names.index(name) for name in FULL_CONFIG.feature_names]
+    values = np.round(table.values[rows][:, :, columns].astype(np.float64), 9)
+    masks = table.feature_mask[rows][:, :, columns]
+    return np.asarray(
+        [
+            hashlib.sha256(value.tobytes() + mask.tobytes()).hexdigest()
+            for value, mask in zip(values, masks, strict=True)
+        ]
+    )
+
+
+def _level_keys(table: EventTable, rows: np.ndarray, level: str) -> set:
+    if level == "message_sender_messageID_sendTime":
+        return {table.events[i].broadcast_id for i in rows}
+    if level == "receive_time_sender_rcvTime":
+        return {(table.source[i], table.events[i].receive_time_ns) for i in rows}
+    if level == "bare_source_id":
+        return set(table.source[rows].tolist())
+    if level == "trajectory_window_L10":
+        return set(_window_keys(table, rows).tolist())
+    raise ValueError(f"Unknown overlap level: {level}")
+
+
+def overlap_counts(table: EventTable, left: np.ndarray, right: np.ndarray) -> dict[str, Any]:
+    """Shared keys between two row sets at every overlap level."""
+    out = {}
+    for level in OVERLAP_LEVELS:
+        a = _level_keys(table, left, level)
+        b = _level_keys(table, right, level)
+        out[level] = {"left_unique": len(a), "right_unique": len(b), "shared": len(a & b)}
+    return out
+
+
+def benign_overlap_audit(
+    table: EventTable, loao_partitions: dict[str, dict[str, np.ndarray]]
+) -> dict[str, Any]:
+    """Exact overlap of non-malicious records between the two archives.
+
+    Reported for the whole archives, within each official split, and between the
+    training/validation side and the test side of every LOAO partition supplied.
+    """
+    archives = sorted(set(table.archive.tolist()))
+    benign = table.labels == 0
+
+    def rows(**conditions: str) -> np.ndarray:
+        selected = table.rows(**conditions)
+        return selected[benign[selected]]
+
+    audit: dict[str, Any] = {
+        "levels": {
+            "message_sender_messageID_sendTime": "(sender_id, messageID, sendTime) broadcast key",
+            "receive_time_sender_rcvTime": "(sender_id, rcvTime) of the retained receive copy",
+            "bare_source_id": "sender identifier without the archive prefix",
+            "trajectory_window_L10": (
+                "SHA-256 of the L = 10 model-input window (11 features and validity masks)"
+            ),
+        },
+        "archives": archives,
+        "whole_archive_non_malicious": overlap_counts(
+            table, rows(archive=archives[0]), rows(archive=archives[1])
+        ),
+        "same_official_split_non_malicious": {
+            split: overlap_counts(
+                table,
+                rows(archive=archives[0], split=split),
+                rows(archive=archives[1], split=split),
+            )
+            for split in SPLITS
+        },
+        "loao_train_validation_vs_test_non_malicious": {},
+    }
+    for name, partition in loao_partitions.items():
+        fit = np.concatenate((partition["train"], partition["validation"]))
+        audit["loao_train_validation_vs_test_non_malicious"][name] = overlap_counts(
+            table, fit[benign[fit]], partition["test"][benign[partition["test"]]]
+        )
+    return audit
+
+
+def sender_disjoint_loao_partitions(
+    table: EventTable,
+) -> tuple[dict[str, dict[str, np.ndarray]], dict[str, Any]]:
+    """LOAO partitions with disjoint bare source_id sets on the two sides.
+
+    Bare source_ids are ordered by a salted SHA-256 within attacker-ever and
+    never-attacker strata; the first half may only appear in source-archive train and
+    validation rows, the second half only in target-archive test rows.
+    """
+    attacker_ids = set(table.source[table.labels == 1].tolist())
+    all_ids = sorted(set(table.source.tolist()))
+    source_side: set[str] = set()
+    for stratum in (
+        [sid for sid in all_ids if sid in attacker_ids],
+        [sid for sid in all_ids if sid not in attacker_ids],
+    ):
+        ordered = sorted(
+            stratum, key=lambda sid: hashlib.sha256(f"{DEDUP_SALT}:{sid}".encode()).hexdigest()
+        )
+        source_side.update(ordered[: int(round(DEDUP_SOURCE_FRACTION * len(ordered)))])
+    on_source = np.isin(table.source, sorted(source_side))
+    archives = sorted(set(table.archive.tolist()))
+    partitions: dict[str, dict[str, np.ndarray]] = {}
+    for source in archives:
+        for target in archives:
+            if source == target:
+                continue
+            train = table.rows(split="train", archive=source)
+            validation = table.rows(split="validation", archive=source)
+            test = table.rows(split="test", archive=target)
+            partitions[f"{source}->{target}"] = {
+                "train": train[on_source[train]],
+                "validation": validation[on_source[validation]],
+                "test": test[~on_source[test]],
+            }
+    for name, partition in partitions.items():
+        fit = np.concatenate((partition["train"], partition["validation"]))
+        shared = set(table.source[fit].tolist()) & set(table.source[partition["test"]].tolist())
+        if shared:
+            raise RuntimeError(f"Sender-disjoint LOAO {name} shares {len(shared)} source_ids")
+    return partitions, {
+        "partition_rule": (
+            "bare source_ids ordered by sha256(salt:source_id) within attacker-ever and "
+            "never-attacker strata; the first half is the source side (source-archive "
+            "train and validation), the second half the target side (target-archive test)"
+        ),
+        "salt": DEDUP_SALT,
+        "source_side_fraction": DEDUP_SOURCE_FRACTION,
+        "source_side_senders": len(source_side),
+        "target_side_senders": len(set(all_ids) - source_side),
+    }
+
+
+def run_sender_disjoint_loao(
+    table: EventTable, summary: dict[str, Any], results_dir: Path
+) -> dict[str, Any]:
+    """Fit every detector and seed on the source side; evaluate on the disjoint target."""
+    import torch
+
+    from corridor_aiops.evaluation.benchmark import _split_counts, split_eligibility
+
+    protocol = summary["protocol"]
+    torch.set_num_threads(int(protocol.get("torch_threads") or os.cpu_count() or 1))
+    torch.use_deterministic_algorithms(True)
+    seeds = list(protocol["training_seeds"])
+    models = list(summary["models"])
+    partitions, meta = sender_disjoint_loao_partitions(table)
+    directions: dict[str, Any] = {}
+    for direction, split_rows in partitions.items():
+        reason = split_eligibility(table.labels, split_rows)
+        if reason is not None:
+            directions[direction] = {"status": "NOT_EVALUABLE", "reason": reason}
+            continue
+        summaries, raw, _ = run_models(
+            table,
+            split_rows,
+            models,
+            config=FULL_CONFIG,
+            seeds=seeds,
+            epochs=int(protocol["epochs"]),
+            label=f"sender-disjoint LOAO {direction}",
+        )
+        test = split_rows["test"]
+        for name in models:
+            rows = [
+                confusion(
+                    table.labels[test],
+                    run["test_scores"],
+                    summaries[name]["per_seed"][index]["validation_f1_threshold"],
+                )
+                for index, run in enumerate(raw[name])
+            ]
+            summaries[name]["confusion_per_seed"] = rows
+            summaries[name]["confusion_mean_std"] = _mean_std(rows)
+        directions[direction] = {
+            "status": "EVALUABLE",
+            "class_counts": _split_counts(table.labels, split_rows),
+            "overlap_train_validation_vs_test_non_malicious": overlap_counts(
+                table,
+                np.concatenate((split_rows["train"], split_rows["validation"]))[
+                    table.labels[np.concatenate((split_rows["train"], split_rows["validation"]))]
+                    == 0
+                ],
+                test[table.labels[test] == 0],
+            ),
+            "models": summaries,
+        }
+    result = {
+        "protocol": (
+            "normalization, all detectors, checkpoints, and validation-F1 thresholds fit on "
+            "the source side only; evaluated on the disjoint target side"
+        ),
+        **meta,
+        "training_seeds": seeds,
+        "directions": directions,
+    }
+    (Path(results_dir) / "loao_sender_disjoint.json").write_text(
+        json.dumps(result, indent=2, allow_nan=False) + "\n", encoding="utf-8"
+    )
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Threshold-selection procedures
+# ---------------------------------------------------------------------------
+
+THRESHOLD_PROCEDURES = ("max_f1", "youden_j", "far_1.0pct", "far_5.0pct")
+PROCEDURE_LABELS = {
+    "max_f1": "Max-F1",
+    "youden_j": "Youden $J$",
+    "far_1.0pct": "FAR budget 1\\%",
+    "far_5.0pct": "FAR budget 5\\%",
+}
+PROCEDURE_TAGS = {
+    "max_f1": "MaxF",
+    "youden_j": "Youden",
+    "far_1.0pct": "BudgetOne",
+    "far_5.0pct": "BudgetFive",
+}
+
+
+def youden_threshold(labels: np.ndarray, scores: np.ndarray) -> float:
+    """Validation threshold maximizing TPR - FPR (ties resolved to the higher threshold)."""
+    from sklearn.metrics import roc_curve
+
+    fpr, tpr, thresholds = roc_curve(labels, scores)
+    finite = np.isfinite(thresholds)
+    index = int(np.argmax(np.where(finite, tpr - fpr, -np.inf)))
+    return float(thresholds[index])
+
+
+def procedure_threshold(procedure: str, labels: np.ndarray, scores: np.ndarray) -> float:
+    from corridor_aiops.evaluation.benchmark import _best_f1_threshold, far_budget_threshold
+
+    if procedure == "max_f1":
+        return _best_f1_threshold(labels, scores)
+    if procedure == "youden_j":
+        return youden_threshold(labels, scores)
+    if procedure.startswith("far_"):
+        budget = float(procedure.removeprefix("far_").removesuffix("pct")) / 100.0
+        return far_budget_threshold(scores[labels == 0], budget)
+    raise ValueError(f"Unknown threshold procedure: {procedure}")
+
+
+def threshold_procedures(
+    table: EventTable, summary: dict[str, Any], scores: _Scores
+) -> dict[str, Any]:
+    """Test metrics under each validation threshold procedure and seed-wise differences."""
+    seeds = list(summary["protocol"]["training_seeds"])
+    validation = scores.rows("official", "validation")
+    test = scores.rows("official", "test")
+    out: dict[str, Any] = {
+        "procedures": {
+            "max_f1": "threshold maximizing validation F1",
+            "youden_j": "threshold maximizing validation TPR - FPR (Youden's J)",
+            "far_1.0pct": "conservative validation quantile: non-malicious alert rate <= 1%",
+            "far_5.0pct": "conservative validation quantile: non-malicious alert rate <= 5%",
+        },
+        "reference_procedure": "max_f1",
+        "models": {},
+    }
+    for name in summary["models"]:
+        per_procedure: dict[str, list[dict[str, float]]] = {p: [] for p in THRESHOLD_PROCEDURES}
+        for seed in seeds:
+            v_scores = scores.get("official", name, seed, "validation")
+            t_scores = scores.get("official", name, seed, "test")
+            for procedure in THRESHOLD_PROCEDURES:
+                threshold = procedure_threshold(procedure, table.labels[validation], v_scores)
+                per_procedure[procedure].append(
+                    {"threshold": threshold, **confusion(table.labels[test], t_scores, threshold)}
+                )
+        differences = {}
+        for procedure in THRESHOLD_PROCEDURES[1:]:
+            rows = [
+                {
+                    metric: new[metric] - old[metric]
+                    for metric in ("f1", "recall", "precision", "false_alarm_rate")
+                }
+                for new, old in zip(per_procedure[procedure], per_procedure["max_f1"], strict=True)
+            ]
+            differences[procedure] = {
+                "seedwise_mean_std": _mean_std(rows),
+                "seeds_with_higher_recall": int(sum(row["recall"] > 0 for row in rows)),
+                "seeds_with_higher_far": int(sum(row["false_alarm_rate"] > 0 for row in rows)),
+            }
+        out["models"][name] = {
+            "per_procedure_mean_std": {p: _mean_std(rows) for p, rows in per_procedure.items()},
+            "per_procedure_per_seed": per_procedure,
+            "paired_difference_vs_max_f1": differences,
+        }
+    return out
+
+
 VERDICT_TEXT = {
     "reference_better": "TT better",
     "reference_worse": "TT worse",
@@ -637,18 +973,32 @@ def _seed_bootstrap_table(summary: dict[str, Any], sensitivity: dict[str, Any]) 
     return body
 
 
+def _context_label(context: str) -> str:
+    kind, name = context.split(":", 1)
+    if kind == "pooled":
+        return f"Pooled, {name} test"
+    if kind == "pooledthreshold":
+        return f"Pooled threshold, {name} test"
+    return "LOAO " + name.replace("->", " $\\rightarrow$ ")
+
+
+def _context_tag(context: str) -> str:
+    kind, name = context.split(":", 1)
+    if kind == "pooled":
+        return f"Pooled{CATEGORY_TAGS[name]}"
+    if kind == "pooledthreshold":
+        return f"PooledThr{CATEGORY_TAGS[name]}"
+    source, target = name.split("->")
+    return f"LOAO{CATEGORY_TAGS[source]}To{CATEGORY_TAGS[target]}"
+
+
 def _loao_confusion_table(summary: dict[str, Any], diagnostics: dict[str, Any]) -> list[str]:
     focus = generalization_focus_models(summary)
     body = [
         "Context & Model & Precision & Recall & FAR (\\%) & TP & FN & FP & TN \\\\",
     ]
     for context, block in diagnostics["contexts"].items():
-        kind, name = context.split(":", 1)
-        label = (
-            f"Pooled, {name} test"
-            if kind == "pooled"
-            else "LOAO " + name.replace("->", " $\\rightarrow$ ")
-        )
+        label = _context_label(context)
         body.append("\\midrule")
         for index, model in enumerate(m for m in block["models"] if m in focus):
             stats = block["models"][model]["mean_std"]
@@ -706,14 +1056,9 @@ def _subgroup_table(summary: dict[str, Any], diagnostics: dict[str, Any]) -> lis
         "Context & Model & AUROC & Recall & AUROC & Recall \\\\",
     ]
     for context, block in diagnostics["contexts"].items():
-        if not context.endswith("dosAttack"):
+        if not context.endswith("dosAttack") or context.startswith("pooledthreshold:"):
             continue
-        kind, name = context.split(":", 1)
-        label = (
-            f"Pooled, {name} test"
-            if kind == "pooled"
-            else "LOAO " + name.replace("->", " $\\rightarrow$ ")
-        )
+        label = _context_label(context)
         body.append("\\midrule")
         for index, model in enumerate(m for m in block["models"] if m in focus):
             stats = block["models"][model]["subgroups_mean_std"]
@@ -729,6 +1074,202 @@ def _subgroup_table(summary: dict[str, Any], diagnostics: dict[str, Any]) -> lis
                 + " \\\\"
             )
     return body
+
+
+def _dedup_table(summary: dict[str, Any], diagnostics: dict[str, Any]) -> list[str]:
+    focus = generalization_focus_models(summary)
+    dedup = diagnostics["loao_sender_disjoint"]
+    standard = summary["generalization"]["leave_one_attack_type_out"]
+    body = [
+        "& & \\multicolumn{4}{c}{Standard LOAO} & "
+        "\\multicolumn{4}{c}{Sender-disjoint deduplicated LOAO} \\\\",
+        "\\cmidrule(lr){3-6}\\cmidrule(lr){7-10}",
+        "Direction & Model & AUROC & F1 & Recall & FAR (\\%) & AUROC & F1 & Recall & "
+        "FAR (\\%) \\\\",
+    ]
+    for direction, block in dedup["directions"].items():
+        body.append("\\midrule")
+        label = direction.replace("->", " $\\rightarrow$ ")
+        if block["status"] != "EVALUABLE":
+            body.append(
+                f"{label} & \\multicolumn{{9}}{{l}}{{NOT\\_EVALUABLE: {_escape(block['reason'])}}}"
+                " \\\\"
+            )
+            continue
+        for index, name in enumerate(m for m in block["models"] if m in focus):
+            std_stats = standard[direction]["models"][name]["mean_std_across_training_seeds"]
+            std_conf = diagnostics["contexts"][f"loao:{direction}"]["models"][name]["mean_std"]
+            new_stats = block["models"][name]["mean_std_across_training_seeds"]
+            new_conf = block["models"][name]["confusion_mean_std"]
+            cells = []
+            for stats, conf in ((std_stats, std_conf), (new_stats, new_conf)):
+                cells += [
+                    f"{stats['auroc']['mean']:.3f} $\\pm$ {stats['auroc']['std']:.3f}",
+                    f"{stats['f1_cyber_vs_benign']['mean']:.3f}",
+                    f"{conf['recall']['mean']:.3f}",
+                    f"{100 * conf['false_alarm_rate']['mean']:.2f}",
+                ]
+            body.append(
+                f"{label if index == 0 else ''} & "
+                f"{_escape(summary['models'][name]['display_name'])} & "
+                + " & ".join(cells)
+                + " \\\\"
+            )
+    return body
+
+
+def _threshold_table(summary: dict[str, Any], diagnostics: dict[str, Any]) -> list[str]:
+    procedures = diagnostics["threshold_procedures"]
+    body = [
+        "& "
+        + " & ".join(
+            f"\\multicolumn{{2}}{{c}}{{{PROCEDURE_LABELS[p]}}}" for p in THRESHOLD_PROCEDURES
+        )
+        + " \\\\",
+        "\\cmidrule(lr){2-3}\\cmidrule(lr){4-5}\\cmidrule(lr){6-7}\\cmidrule(lr){8-9}",
+        "Model" + " & Recall & FAR (\\%)" * len(THRESHOLD_PROCEDURES) + " \\\\",
+    ]
+    for title, names in (
+        (
+            "Unsupervised / one-class (fit on non-malicious records)",
+            [n for n, b in summary["models"].items() if b["supervision_regime"] != "supervised"],
+        ),
+        (
+            "Supervised (fit on training labels)",
+            [n for n, b in summary["models"].items() if b["supervision_regime"] == "supervised"],
+        ),
+    ):
+        body += ["\\midrule", f"\\multicolumn{{9}}{{l}}{{\\textit{{{title}}}}} \\\\"]
+        for name in names:
+            stats = procedures["models"][name]["per_procedure_mean_std"]
+            cells = []
+            for procedure in THRESHOLD_PROCEDURES:
+                cells += [
+                    f"{stats[procedure]['recall']['mean']:.3f}",
+                    f"{100 * stats[procedure]['false_alarm_rate']['mean']:.2f}",
+                ]
+            body.append(
+                f"{_escape(summary['models'][name]['display_name'])} & "
+                + " & ".join(cells)
+                + " \\\\"
+            )
+    return body
+
+
+def _extra_macro_lines(summary: dict[str, Any], diagnostics: dict[str, Any]) -> list[str]:
+    lines: list[str] = []
+
+    def define(name: str, value: Any) -> None:
+        if not name.isalpha():
+            raise ValueError(f"Invalid LaTeX macro name: {name}")
+        lines.append(f"\\newcommand{{\\{name}}}{{{value}}}")
+
+    def count(value: float) -> str:
+        return f"{value:,.0f}".replace(",", "{,}")
+
+    audit = diagnostics["benign_overlap_audit"]
+    whole = audit["whole_archive_non_malicious"]
+    same = audit["same_official_split_non_malicious"]
+    level_tags = {
+        "message_sender_messageID_sendTime": "Messages",
+        "receive_time_sender_rcvTime": "Receives",
+        "bare_source_id": "Senders",
+        "trajectory_window_L10": "Windows",
+    }
+    for level, tag in level_tags.items():
+        define(f"ResOverlapArchive{tag}", count(whole[level]["shared"]))
+        define(
+            f"ResOverlapSameSplit{tag}",
+            count(sum(block[level]["shared"] for block in same.values())),
+        )
+        standard = [
+            block[level]["shared"]
+            for name, block in audit["loao_train_validation_vs_test_non_malicious"].items()
+            if name.startswith("standard:")
+        ]
+        dedup = [
+            block[level]["shared"]
+            for name, block in audit["loao_train_validation_vs_test_non_malicious"].items()
+            if name.startswith("dedup:")
+        ]
+        define(f"ResOverlapLOAO{tag}", count(max(standard)))
+        define(f"ResOverlapDedup{tag}", count(max(dedup)))
+    define(
+        "ResOverlapArchiveBenignReplay",
+        count(whole["message_sender_messageID_sendTime"]["left_unique"]),
+    )
+    define(
+        "ResOverlapArchiveBenignDoS",
+        count(whole["message_sender_messageID_sendTime"]["right_unique"]),
+    )
+
+    dedup = diagnostics["loao_sender_disjoint"]
+    define("ResDedupSourceSenders", count(dedup["source_side_senders"]))
+    define("ResDedupTargetSenders", count(dedup["target_side_senders"]))
+    supervised = [
+        n for n, b in summary["models"].items() if b["supervision_regime"] == "supervised"
+    ]
+    standard_loao = summary["generalization"]["leave_one_attack_type_out"]
+    below_standard = below_dedup = pairs = 0
+    for direction, block in dedup["directions"].items():
+        if block["status"] != "EVALUABLE":
+            continue
+        source, target = direction.split("->")
+        tag = f"{CATEGORY_TAGS[source]}To{CATEGORY_TAGS[target]}"
+        counts_test = block["class_counts"]["test"]
+        define(f"ResDedup{tag}TestRecords", count(counts_test["records"]))
+        define(f"ResDedup{tag}TestAttackers", count(counts_test["attacker_1_misbehavior"]))
+        for name, result in block["models"].items():
+            model_tag = MACRO_MODEL_NAMES[name]
+            stats = result["mean_std_across_training_seeds"]
+            conf = result["confusion_mean_std"]
+            define(
+                f"ResDedup{tag}{model_tag}AUROC",
+                f"{stats['auroc']['mean']:.3f} $\\pm$ {stats['auroc']['std']:.3f}",
+            )
+            define(f"ResDedup{tag}{model_tag}FOne", f"{stats['f1_cyber_vs_benign']['mean']:.3f}")
+            define(f"ResDedup{tag}{model_tag}Recall", f"{conf['recall']['mean']:.3f}")
+            define(f"ResDedup{tag}{model_tag}FAR", f"{100 * conf['false_alarm_rate']['mean']:.2f}")
+            if name in supervised:
+                pairs += 1
+                below_dedup += int(stats["auroc"]["mean"] < 0.5)
+                below_standard += int(
+                    standard_loao[direction]["models"][name]["mean_std_across_training_seeds"][
+                        "auroc"
+                    ]["mean"]
+                    < 0.5
+                )
+    define("ResDedupSupPairs", pairs)
+    define("ResDedupBelowHalf", below_dedup)
+    define("ResStdBelowHalf", below_standard)
+
+    procedures = diagnostics["threshold_procedures"]
+    for name, block in procedures["models"].items():
+        model_tag = MACRO_MODEL_NAMES[name]
+        for procedure in THRESHOLD_PROCEDURES:
+            stats = block["per_procedure_mean_std"][procedure]
+            ptag = PROCEDURE_TAGS[procedure]
+            define(f"ResThr{ptag}{model_tag}Recall", f"{stats['recall']['mean']:.3f}")
+            define(f"ResThr{ptag}{model_tag}FAR", f"{100 * stats['false_alarm_rate']['mean']:.2f}")
+        youden = block["paired_difference_vs_max_f1"]["youden_j"]
+        define(
+            f"ResThrYoudenDelta{model_tag}FAR",
+            f"{100 * youden['seedwise_mean_std']['false_alarm_rate']['mean']:+.2f}",
+        )
+        define(
+            f"ResThrYoudenDelta{model_tag}Recall",
+            f"{youden['seedwise_mean_std']['recall']['mean']:+.3f}",
+        )
+        define(f"ResThrYoudenHigherFARSeeds{model_tag}", youden["seeds_with_higher_far"])
+    youden_far_up = sum(
+        block["paired_difference_vs_max_f1"]["youden_j"]["seeds_with_higher_far"]
+        == len(summary["protocol"]["training_seeds"])
+        for name, block in procedures["models"].items()
+        if name in supervised
+    )
+    define("ResThrYoudenFARUpAllSeedsSup", youden_far_up)
+    define("ResThrSupCount", len(supervised))
+    return lines
 
 
 def _write_macros(
@@ -796,12 +1337,7 @@ def _write_macros(
     define("ResFeatReversedCount", len(features["reversed_features"]))
     define("ResFeatMargin", f"{features['direction_margin']:.2f}")
     for context, block in diagnostics["contexts"].items():
-        kind, name = context.split(":", 1)
-        if kind == "pooled":
-            ctag = f"Pooled{CATEGORY_TAGS[name]}"
-        else:
-            source, target = name.split("->")
-            ctag = f"LOAO{CATEGORY_TAGS[source]}To{CATEGORY_TAGS[target]}"
+        ctag = _context_tag(context)
         define(f"ResConf{ctag}Attackers", count(block["test_class_counts"]["attacker"]))
         for model, result in block["models"].items():
             tag = MACRO_MODEL_NAMES[model]
@@ -869,6 +1405,25 @@ def analyze(
         "contexts": confusion_diagnostics(table, summary, scores, outcomes),
         "scores": meta,
     }
+    _log("benign overlap audit, sender-disjoint LOAO, threshold procedures")
+    dedup_path = results_dir / "loao_sender_disjoint.json"
+    if not dedup_path.exists():
+        raise FileNotFoundError(
+            f"{dedup_path.name} is missing; run with --rerun to fit the sender-disjoint LOAO"
+        )
+    dedup_partitions, _ = sender_disjoint_loao_partitions(table)
+    standard_partitions = {
+        key.split(":", 1)[1]: rows for key, rows in _contexts(table).items() if key != "official"
+    }
+    diagnostics["benign_overlap_audit"] = benign_overlap_audit(
+        table,
+        {
+            **{f"standard:{name}": rows for name, rows in standard_partitions.items()},
+            **{f"dedup:{name}": rows for name, rows in dedup_partitions.items()},
+        },
+    )
+    diagnostics["loao_sender_disjoint"] = json.loads(dedup_path.read_text(encoding="utf-8"))
+    diagnostics["threshold_procedures"] = threshold_procedures(table, summary, scores)
     (results_dir / "loao_diagnostics.json").write_text(
         json.dumps(diagnostics, indent=2, allow_nan=False) + "\n", encoding="utf-8"
     )
@@ -891,7 +1446,23 @@ def analyze(
         6,
         _subgroup_table(summary, diagnostics),
     )
+    _write(
+        results_dir / "results_loao_dedup.tex", "llcccccccc", 10, _dedup_table(summary, diagnostics)
+    )
+    _write(
+        results_dir / "results_threshold_procedures.tex",
+        "lcccccccc",
+        9,
+        _threshold_table(summary, diagnostics),
+    )
     _write_macros(summary, sensitivity, diagnostics, meta, results_dir / "sensitivity_macros.tex")
+    macros_path = results_dir / "sensitivity_macros.tex"
+    macros_path.write_text(
+        macros_path.read_text(encoding="utf-8")
+        + "\n".join(_extra_macro_lines(summary, diagnostics))
+        + "\n",
+        encoding="utf-8",
+    )
     ablation_path = results_dir / "ablation_summary.json"
     write_text_macros(
         summary,
@@ -920,6 +1491,8 @@ def main() -> None:
     table, _ = load_event_table(args.data_dir)
     if args.rerun or not (args.results_dir / SCORES_FILE).exists():
         compute_scores(table, summary, args.results_dir)
+    if args.rerun or not (args.results_dir / "loao_sender_disjoint.json").exists():
+        run_sender_disjoint_loao(table, summary, args.results_dir)
     analyze(table, summary, args.results_dir, args.data_dir, samples)
     _log("sensitivity analysis finished")
 

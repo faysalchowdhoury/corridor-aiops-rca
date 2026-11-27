@@ -250,6 +250,55 @@ def _read_json_array(path: Path) -> list[dict[str, Any]]:
     return value
 
 
+NOT_ACQUIRED_SCENARIOS = ("InTAS_highway_7", "InTAS_urban_7")
+
+
+def heldout_scenario_status(raw_dir: Path) -> dict[str, Any]:
+    """Status of the independently simulated held-out scenario for both result files.
+
+    EVALUABLE when the checksum-verified held-out manifest written by
+    ``corridor-ingest --heldout-only`` lists archives that are present on disk.
+    """
+    heldout_dir = Path(raw_dir) / "veremi_heldout"
+    manifest_path = heldout_dir / "manifest.json"
+    not_acquired = {
+        scenario: (
+            "NOT_EVALUATED: published in the same Zenodo record but not acquired because of "
+            "archive size relative to the evaluation machine"
+        )
+        for scenario in NOT_ACQUIRED_SCENARIOS
+    }
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        archives = [
+            item["filename"]
+            for item in manifest
+            if item["filename"].endswith(".zip") and (heldout_dir / item["filename"]).exists()
+        ]
+        verified = all(item.get("zenodo_checksum_verified") for item in manifest)
+        if archives and verified:
+            scenario = archives[0].rsplit("_", 1)[0]
+            return {
+                "status": "EVALUABLE",
+                "scenario": scenario,
+                "archives": archives,
+                "protocol": (
+                    "official test split only; models, normalization, checkpoints, and "
+                    "thresholds from InTAS_highway_2 applied unchanged"
+                ),
+                "results_file": "results/heldout_scenario.json",
+                "not_evaluated": not_acquired,
+            }
+    return {
+        "status": "NOT_EVALUABLE",
+        "reason": (
+            "No checksum-verified held-out scenario is present; run "
+            "`corridor-ingest --heldout-only` to acquire InTAS_urban_2"
+        ),
+        "not_evaluated": not_acquired,
+    }
+
+
 def _tampa_summary(data_dir: Path) -> dict[str, Any]:
     bsm = _read_json_array(data_dir / "tampa" / "tampa_bsm.json")
     spat = _read_json_array(data_dir / "tampa" / "tampa_spat.json")
@@ -663,13 +712,7 @@ def run_dataset_audit(
                             "boundaries are not preserved by this partition."
                         ),
                     },
-                    "independent_scenario_holdout": {
-                        "status": "NOT_EVALUABLE",
-                        "reason": (
-                            "Both acquired attack subsets are InTAS_highway_2; no second "
-                            "independent corridor scenario is present."
-                        ),
-                    },
+                    "independent_scenario_holdout": heldout_scenario_status(data_dir),
                 },
             },
             "track_a2_pems_bay_labeled_anomaly_evaluation": {

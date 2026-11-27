@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "corridor-aiops-rca"
 version = "0.1.0"
-description = "Evidence-limited misbehavior detection for connected-vehicle telemetry using causal trajectory features and sender-cluster evaluation"
+description = "Attack-specific misbehavior detection in connected-vehicle networks: a sender-clustered evaluation of cross-attack generalization"
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 license = {text = "MIT"}
@@ -34,6 +34,7 @@ corridor-reproduce = "corridor_aiops.evaluation.reproduce:main"
 corridor-sensitivity = "corridor_aiops.evaluation.sensitivity:main"
 corridor-heldout = "corridor_aiops.evaluation.heldout:main"
 corridor-clean-audit = "corridor_aiops.evaluation.clean_checkout:main"
+corridor-readme = "corridor_aiops.evaluation.readme:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

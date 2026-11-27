@@ -1,26 +1,26 @@
 {
   "scores_file": "scores/per_seed_scores.npz",
-  "scores_sha256": "6a4ae760d8655d4c2919a8c98805cb756eb6ad500e1d7db0600acc9a0f5f5b61",
+  "scores_sha256": "472e76af86f40147535a3ca12c042bcfee3fdd9648da014e71bc88678034f319",
   "tolerance": 1e-06,
   "verification_against_benchmark_summary": {
     "official": {
-      "per_seed_metric_values_compared": 675,
+      "per_seed_metric_values_compared": 765,
       "values_over_tolerance": 0,
-      "max_abs_delta": 1.1102230246251565e-16,
+      "max_abs_delta": 5.551115123125783e-17,
       "checkpoint_hashes_matched": 45,
       "checkpoint_hashes_compared": 45
     },
     "loao:dataReplay->dosAttack": {
-      "per_seed_metric_values_compared": 675,
+      "per_seed_metric_values_compared": 765,
       "values_over_tolerance": 0,
-      "max_abs_delta": 1.1687409373628554e-08,
+      "max_abs_delta": 1.8078884944650042e-08,
       "checkpoint_hashes_matched": 45,
       "checkpoint_hashes_compared": 45
     },
     "loao:dosAttack->dataReplay": {
-      "per_seed_metric_values_compared": 675,
+      "per_seed_metric_values_compared": 765,
       "values_over_tolerance": 0,
-      "max_abs_delta": 7.776334326470291e-08,
+      "max_abs_delta": 2.7755575615628914e-17,
       "checkpoint_hashes_matched": 45,
       "checkpoint_hashes_compared": 45
     }

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "evidence_source": "results/dataset_capability_matrix.json",
-  "dataset_capability_matrix_sha256": "5a07b07610722bbd0a753b5bb6526fc7fa338e8c0a413488e060f4e80f95297b",
+  "dataset_capability_matrix_sha256": "74720e2560e62889c1caf4f70f66d4a439c60d4e6a759852d3fd57e675aa33a1",
   "scope": "Eligibility reflects available labels and input modalities only. It does not imply that a model is trained, benchmarked, or validated.",
   "models": [
     {
@@ -279,5 +279,5 @@
     "work_zone_false_alarm_rate": "Not evaluable without time-aligned work-zone and traffic observations.",
     "track_b_cross_modal_fusion": "Not evaluable without temporally and spatially aligned modalities."
   },
-  "benchmark_summary_sha256": "d795d173b04cd620fdcccf7ad33b4b660a53189bccfb5dfde58f6a97638deaa1"
+  "benchmark_summary_sha256": "f1721fb0741fbd51069b9ed06691a9cfa48dffff759882be3162925e430aaaf6"
 }

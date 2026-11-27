@@ -49,12 +49,7 @@ def _event(
 
 def _capability_matrix() -> dict:
     datasets = ("veremi", "pems_bay", "tampa_cv", "caltrans_lcs")
-    return {
-        "datasets": {
-            dataset: {"metrics": _capabilities(dataset)}
-            for dataset in datasets
-        }
-    }
+    return {"datasets": {dataset: {"metrics": _capabilities(dataset)} for dataset in datasets}}
 
 
 def test_v2x_graph_slices_keep_splits_and_build_local_symmetric_edges() -> None:
@@ -88,9 +83,7 @@ def test_model_eligibility_distinguishes_data_support_from_causal_rca() -> None:
     for model in models.values():
         tasks = model["data_task_eligibility"]
         expected_a1 = (
-            "NOT_EVALUABLE"
-            if model["name"] == "corridor_log_transformer"
-            else "DATA_ELIGIBLE"
+            "NOT_EVALUABLE" if model["name"] == "corridor_log_transformer" else "DATA_ELIGIBLE"
         )
         assert tasks["track_a1_detection"] == expected_a1
         assert tasks["track_a1_attacker_emitter_localization"] == expected_a1

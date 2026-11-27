@@ -70,26 +70,53 @@ def _main_table(summary: dict[str, Any]) -> list[str]:
     return body
 
 
+def _ms_ci(
+    stats: dict[str, Any],
+    intervals: dict[str, list[float]],
+    key: str,
+    scale: float = 1.0,
+    digits: int = 3,
+) -> str:
+    """Seed mean $\\pm$ std followed by the first-seed cluster-bootstrap 95% interval."""
+    interval = intervals.get(key)
+    ci = f" {_ci(interval, scale, digits - 1)}" if interval is not None else ""
+    return _ms(stats, key, scale, digits) + ci
+
+
 def _operating_table(summary: dict[str, Any]) -> list[str]:
     models = summary["models"]
+    intervals = summary["uncertainty"]["sender_cluster_bootstrap"]["intervals_95pct"]
     body = [
-        "& \\multicolumn{2}{c}{Test ROC TPR} & \\multicolumn{2}{c}{Val.-calibrated recall "
-        "(realized FAR)} \\\\",
-        "\\cmidrule(lr){2-3}\\cmidrule(lr){4-5}",
-        "Model & FAR 1\\% & FAR 5\\% & budget 1\\% & budget 5\\% \\\\",
+        "& \\multicolumn{2}{c}{Test ROC TPR} & \\multicolumn{2}{c}{Val.-calibrated, "
+        "budget 1\\%} & \\multicolumn{2}{c}{Val.-calibrated, budget 5\\%} \\\\",
+        "\\cmidrule(lr){2-3}\\cmidrule(lr){4-5}\\cmidrule(lr){6-7}",
+        "Model & FAR 1\\% & FAR 5\\% & Recall & Realized FAR (\\%) & Recall & "
+        "Realized FAR (\\%) \\\\",
     ]
     for title, names in _grouped(models):
-        body += ["\\midrule", f"\\multicolumn{{5}}{{l}}{{\\textit{{{title}}}}} \\\\"]
+        body += ["\\midrule", f"\\multicolumn{{7}}{{l}}{{\\textit{{{title}}}}} \\\\"]
         for name in names:
             stats = models[name]["mean_std_across_training_seeds"]
+            model_intervals = intervals.get(name, {})
             cells = [
                 _ms(stats, "test_roc_tpr_at_far_1.0pct"),
                 _ms(stats, "test_roc_tpr_at_far_5.0pct"),
             ]
             for budget in ("1.0", "5.0"):
-                recall = stats[f"validation_calibrated_recall_at_far_{budget}pct"]["mean"]
-                far = stats[f"validation_calibrated_realized_far_at_far_{budget}pct"]["mean"]
-                cells.append(f"{recall:.3f} ({100 * far:.2f}\\%)")
+                cells.append(
+                    _ms_ci(
+                        stats, model_intervals, f"validation_calibrated_recall_at_far_{budget}pct"
+                    )
+                )
+                cells.append(
+                    _ms_ci(
+                        stats,
+                        model_intervals,
+                        f"validation_calibrated_realized_far_at_far_{budget}pct",
+                        100.0,
+                        2,
+                    )
+                )
             body.append(f"{_escape(models[name]['display_name'])} & " + " & ".join(cells) + " \\\\")
     return body
 
@@ -154,12 +181,16 @@ def _generalization_table(summary: dict[str, Any]) -> list[str]:
             rows.append((label, block["models"], None))
         else:
             rows.append((label, None, block["reason"]))
-    holdout = generalization.get("sender_disjoint_holdout")
-    if holdout:
-        if holdout["status"] == "EVALUABLE":
-            rows.append(("Sender-disjoint holdout", holdout["models"], None))
-        else:
-            rows.append(("Sender-disjoint holdout", None, holdout["reason"]))
+    for key, title in (
+        ("sender_disjoint_holdout", "Sender-disjoint holdout"),
+        ("chronological_holdout", "Chronological holdout"),
+    ):
+        holdout = generalization.get(key)
+        if holdout:
+            if holdout["status"] == "EVALUABLE":
+                rows.append((title, holdout["models"], None))
+            else:
+                rows.append((title, None, holdout["reason"]))
     for label, models, reason in rows:
         body.append("\\midrule")
         if models is None:
@@ -186,6 +217,7 @@ def _ablation_table(summary: dict[str, Any], ablation: dict[str, Any]) -> list[s
         "timing_and_jitter": "No timing or jitter",
         "local_density": "No local density",
         "validity_masks": "No validity masks",
+        "one_class_window_length": "One-class $L=10$",
     }
     body = [
         "Ablation & Model & F1 & AUROC & $\\Delta$AUROC & $\\Delta$TPR@FAR 1\\% \\\\",
@@ -197,8 +229,9 @@ def _ablation_table(summary: dict[str, Any], ablation: dict[str, Any]) -> list[s
             stats = result["variant_mean_std_across_training_seeds"]
             delta = result["variant_minus_full_mean"]
             label = labels.get(family, _escape(family)) if index == 0 else ""
+            display = result.get("display_name") or _escape(full_names[name]["display_name"])
             body.append(
-                f"{label} & {_escape(full_names[name]['display_name'])} & "
+                f"{label} & {display} & "
                 f"{_ms(stats, 'f1_cyber_vs_benign')} & {_ms(stats, 'auroc')} & "
                 f"{delta['auroc']:+.3f} & {delta['test_roc_tpr_at_far_1.0pct']:+.3f} \\\\"
             )
@@ -210,7 +243,7 @@ def write_tables(
 ) -> None:
     output_dir = Path(output_dir)
     _write(output_dir / "results_table.tex", "lcccc", 5, _main_table(summary))
-    _write(output_dir / "results_operating_points.tex", "lcccc", 5, _operating_table(summary))
+    _write(output_dir / "results_operating_points.tex", "lcccccc", 7, _operating_table(summary))
     _write(output_dir / "results_bootstrap.tex", "lcccc", 5, _bootstrap_table(summary))
     if summary.get("generalization"):
         _write(
@@ -235,6 +268,8 @@ MACRO_MODEL_NAMES = {
     "xgboost": "XGBoost",
     "supervised_mlp": "MLP",
     "tabular_transformer": "TabTransformer",
+    "isolation_forest_L10": "IsolationForestTen",
+    "one_class_svm_L10": "OneClassSVMTen",
 }
 MACRO_METRICS = {
     "f1_cyber_vs_benign": ("FOne", 1.0, 3),
@@ -475,6 +510,37 @@ def write_macros(summary: dict[str, Any], ablation: dict[str, Any] | None, path:
                 tag = MACRO_MODEL_NAMES[name]
                 define(f"ResSender{tag}AUROC", _macro_value(stats, "auroc", 1.0, 3))
                 define(f"ResSender{tag}FOne", _macro_value(stats, "f1_cyber_vs_benign", 1.0, 3))
+    chronological = generalization.get("chronological_holdout")
+    if chronological:
+        define("ResChronoStatus", chronological["status"].replace("_", "\\_"))
+        if chronological["status"] == "EVALUABLE":
+            for split, value in chronological["class_counts"].items():
+                define(f"ResChrono{split.capitalize()}Records", counts(value["records"]))
+            define(
+                "ResChronoTrainTestSenderOverlap",
+                counts(chronological["bare_source_id_train_test_overlap"]),
+            )
+            for name, result in chronological["models"].items():
+                stats = result["mean_std_across_training_seeds"]
+                tag = MACRO_MODEL_NAMES[name]
+                define(f"ResChrono{tag}AUROC", _macro_value(stats, "auroc", 1.0, 3))
+                define(f"ResChrono{tag}FOne", _macro_value(stats, "f1_cyber_vs_benign", 1.0, 3))
+                define(
+                    f"ResChrono{tag}FAR",
+                    _macro_value(stats, "false_alarm_rate_non_malicious", 100.0, 2),
+                )
+    for name, interval in bootstrap["intervals_95pct"].items():
+        tag = MACRO_MODEL_NAMES[name]
+        for budget, suffix in (("1.0", "One"), ("5.0", "Five")):
+            key = f"validation_calibrated_recall_at_far_{budget}pct"
+            if key in interval:
+                define(f"Res{tag}CalRecall{suffix}CI", _ci(interval[key]))
+                define(
+                    f"Res{tag}CalFAR{suffix}CI",
+                    _ci(
+                        interval[f"validation_calibrated_realized_far_at_far_{budget}pct"], 100.0, 2
+                    ),
+                )
     if ablation is not None:
         define(
             "ResTopBaseline", summary["models"][ablation["top_supervised_baseline"]]["display_name"]
@@ -485,10 +551,14 @@ def write_macros(summary: dict[str, Any], ablation: dict[str, Any] | None, path:
             "timing_and_jitter": "Timing",
             "local_density": "Density",
             "validity_masks": "Masks",
+            "one_class_window_length": "OneClassWindow",
         }
         for family, block in ablation["ablations"].items():
             for name, result in block["models"].items():
-                tag = "TT" if name == "tabular_transformer" else "Top"
+                if name in ("isolation_forest_L10", "one_class_svm_L10"):
+                    tag = MACRO_MODEL_NAMES[name]
+                else:
+                    tag = "TT" if name == "tabular_transformer" else "Top"
                 stats = result["variant_mean_std_across_training_seeds"]
                 define(f"ResAbl{families[family]}{tag}AUROC", _macro_value(stats, "auroc", 1.0, 3))
                 define(

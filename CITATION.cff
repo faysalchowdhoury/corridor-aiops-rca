@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 title: "CorridorAIOps-RCA"
-abstract: "Evidence-limited misbehavior detection for connected-vehicle telemetry on official VeReMi NextGen splits, using causal trajectory features, composite sender-cluster bootstrap evaluation, and a measured reproduction audit."
+abstract: "Attack-specific misbehavior detection in connected-vehicle networks: a sender-clustered evaluation of cross-attack generalization on official VeReMi NextGen splits, using past-only (temporally causal) trajectory features, composite sender-cluster bootstrap evaluation, and measured reproduction audits."
 authors:
   - family-names: Chowdhoury
     given-names: "Faysal A."

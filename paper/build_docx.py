@@ -97,9 +97,11 @@ def build(pandoc: Path, output: Path = PAPER / "main.docx") -> Path:
             "--from=latex",
             "--to=docx",
             "--citeproc",
-            f"--bibliography={PAPER / 'references.bib'}",
-            f"--resource-path={PAPER}",
-            *([f"--csl={PAPER / 'ieee.csl'}"] if (PAPER / "ieee.csl").exists() else []),
+            # Paths are relative to PAPER (the working directory below): pandoc copies the
+            # --csl value into the document properties, so an absolute path would leak.
+            "--bibliography=references.bib",
+            "--resource-path=.",
+            *(["--csl=ieee.csl"] if (PAPER / "ieee.csl").exists() else []),
             "--output",
             str(work / "main.docx"),
         ]
@@ -107,7 +109,7 @@ def build(pandoc: Path, output: Path = PAPER / "main.docx") -> Path:
             reference = work / "reference.docx"
             shutil.copyfile(output, reference)
             command.insert(-2, f"--reference-doc={reference}")
-        subprocess.run(command, check=True)
+        subprocess.run(command, check=True, cwd=PAPER)
         shutil.copyfile(work / "main.docx", output)
     return output
 

@@ -8,9 +8,7 @@ from corridor_aiops.data.audit import METRIC_NAMES, _capabilities
 def test_veremi_gate_allows_only_labeled_detection_emitter_localization_and_scoped_mttd() -> None:
     capabilities = _capabilities("veremi")
     evaluable = {
-        metric
-        for metric, capability in capabilities.items()
-        if capability["status"] == "EVALUABLE"
+        metric for metric, capability in capabilities.items() if capability["status"] == "EVALUABLE"
     }
 
     assert evaluable == {"detection", "emitter_or_node_localization", "mttd"}

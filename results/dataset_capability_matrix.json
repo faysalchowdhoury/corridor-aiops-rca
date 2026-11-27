@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-11-27T06:41:03.451064+00:00",
-  "repository_commit_sha": "c6b2db966aa558f3947d4b5f8f70e9842be9f4e0",
+  "generated_at_utc": "2026-11-27T17:15:50.338660+00:00",
+  "repository_commit_sha": "7e455dbca3ec22adb90a96b8623fc98c259bc7b1",
   "audit_script": "corridor_aiops.data.audit.run_dataset_audit",
-  "audit_script_sha256": "b9cbad7867761c0679edfa374b6e92ff51fd6201735ac4b2819d655f675521ef",
-  "repository_worktree_dirty": false,
+  "audit_script_sha256": "e8bd5171852e29b0d24dca06e34231d9b7ca406789c0f5b076f1312268c0218d",
+  "repository_worktree_dirty": true,
   "source_manifest_sha256": "7dbafc752f31e4ce5936bb8e56c729f77bf9972707d5e4938f2bfef404fc35eb",
   "verified_source_files": {
     "InTAS_highway_2_dataReplay.zip": {
@@ -789,8 +789,18 @@
           "note": "Senders are partitioned by bare source_id across both archives and all official splits, which implies zero composite (corridor_id, source_id) overlap. Official temporal split boundaries are not preserved by this partition."
         },
         "independent_scenario_holdout": {
-          "status": "NOT_EVALUABLE",
-          "reason": "Both acquired attack subsets are InTAS_highway_2; no second independent corridor scenario is present."
+          "status": "EVALUABLE",
+          "scenario": "InTAS_urban_2",
+          "archives": [
+            "InTAS_urban_2_dataReplay.zip",
+            "InTAS_urban_2_dosAttack.zip"
+          ],
+          "protocol": "official test split only; models, normalization, checkpoints, and thresholds from InTAS_highway_2 applied unchanged",
+          "results_file": "results/heldout_scenario.json",
+          "not_evaluated": {
+            "InTAS_highway_7": "NOT_EVALUATED: published in the same Zenodo record but not acquired because of archive size relative to the evaluation machine",
+            "InTAS_urban_7": "NOT_EVALUATED: published in the same Zenodo record but not acquired because of archive size relative to the evaluation machine"
+          }
         }
       }
     },

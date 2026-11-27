@@ -31,8 +31,7 @@ def _bsm(
 ) -> CorridorEvent:
     return CorridorEvent(
         event_id=event_id,
-        timestamp=datetime(2022, 1, 1, tzinfo=timezone.utc)
-        + timedelta(seconds=second),
+        timestamp=datetime(2022, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=second),
         corridor_id="trace",
         source_id=source_id,
         kind=EventKind.BSM,
@@ -124,18 +123,12 @@ def test_jitter_uses_only_prior_intervals_and_is_not_changed_by_future_events() 
     assert prefix[1].feature_mask[-1][jitter_index] is False
     assert _last_features(prefix[2])["causal_jitter_s"] == pytest.approx(1.0)
     assert prefix[2].feature_mask[-1][jitter_index] is True
-    assert [window.values for window in prefix] == [
-        window.values for window in complete[:3]
-    ]
+    assert [window.values for window in prefix] == [window.values for window in complete[:3]]
 
 
 def test_nanosecond_time_is_used_when_python_datetimes_are_equal() -> None:
-    first = _bsm("a0", "a", 0.0, 0.0, 0.0).model_copy(
-        update={"receive_time_ns": 1_000_000_000}
-    )
-    second = _bsm("a1", "a", 0.0, 1.0, 0.0).model_copy(
-        update={"receive_time_ns": 1_000_000_100}
-    )
+    first = _bsm("a0", "a", 0.0, 0.0, 0.0).model_copy(update={"receive_time_ns": 1_000_000_000})
+    second = _bsm("a1", "a", 0.0, 1.0, 0.0).model_copy(update={"receive_time_ns": 1_000_000_100})
 
     windows = extract_trajectory_windows([first, second], window_size=2)
 
