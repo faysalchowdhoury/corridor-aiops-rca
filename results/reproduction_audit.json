@@ -1,17 +1,260 @@
 {
-  "determinism_status": "NOT_COMPLETED",
-  "determinism_claim": "none; no completed second-run comparison exists",
-  "attempts": [
+  "generated_at_utc": "2026-11-27T06:22:10.602359+00:00",
+  "procedure": "independent second run of the full benchmark in a fresh Python process from the same raw data into results_repro_check/, then value-by-value comparison against results/",
+  "command": [
+    "python.exe",
+    "-m",
+    "corridor_aiops.evaluation.benchmark",
+    "--data-dir",
+    "data\\raw\\veremi",
+    "--output-dir",
+    "results_repro_check",
+    "--train-seeds",
+    "5",
+    "--bootstrap-samples",
+    "1000",
+    "--bootstrap-preview-rows",
+    "20",
+    "--epochs",
+    "5"
+  ],
+  "second_run_wall_clock_seconds": 3880.4701128000015,
+  "determinism_status": "NOT_BIT_IDENTICAL",
+  "numeric_values_compared": 55844,
+  "numeric_values_with_nonzero_delta": 24,
+  "max_abs_numeric_delta": 4.882110704595988e-08,
+  "nonzero_deltas": [
     {
-      "recorded_at_utc": "2026-11-27T03:32:00+00:00",
-      "outcome": "attempt 1 started 2026-11-26 22:32 local time and was terminated when its controlling session ended; no outputs were written",
-      "detail": ""
+      "file": "benchmark_summary.json",
+      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.mean_std_across_training_seeds.auroc.mean",
+      "first": 0.8092931640887919,
+      "second": 0.809293164088792,
+      "abs_delta": 1.1102230246251565e-16
     },
     {
-      "recorded_at_utc": "2026-11-27T05:00:11.815589+00:00",
-      "outcome": "the first attempt was terminated together with its controlling session and the second ran out of system memory while other workloads shared the machine",
-      "detail": "attempt 2 started 2026-11-26 23:05 local time; numpy _ArrayMemoryError during hist_gradient_boosting seed 43 of the main comparison (7.7 GB RAM, under 1 GB free)"
+      "file": "benchmark_summary.json",
+      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.mean_std_across_training_seeds.auroc.std",
+      "first": 0.006922106970368696,
+      "second": 0.006922106970368684,
+      "abs_delta": 1.214306433183765e-17
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.mean_std_across_training_seeds.average_precision.mean",
+      "first": 0.6089065451529441,
+      "second": 0.6089065387864444,
+      "abs_delta": 6.366499660792613e-09
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.mean_std_across_training_seeds.average_precision.std",
+      "first": 0.008201129418467465,
+      "second": 0.008201121358931016,
+      "abs_delta": 8.059536449681048e-09
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.per_seed[0].average_precision",
+      "first": 0.6053665671413657,
+      "second": 0.6053665623889551,
+      "abs_delta": 4.752410576180921e-09
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.per_seed[1].average_precision",
+      "first": 0.6097112876823179,
+      "second": 0.60971127214563,
+      "abs_delta": 1.553668782516837e-08
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.per_seed[2].average_precision",
+      "first": 0.600239947749879,
+      "second": 0.6002399500259499,
+      "abs_delta": 2.2760708873192925e-09
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.per_seed[3].average_precision",
+      "first": 0.6222148341043412,
+      "second": 0.6222148160080734,
+      "abs_delta": 1.80962678175689e-08
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.per_seed[4].auroc",
+      "first": 0.8062578643267213,
+      "second": 0.8062578643267214,
+      "abs_delta": 1.1102230246251565e-16
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.per_seed[4].average_precision",
+      "first": 0.6070000890868162,
+      "second": 0.6070000933636137,
+      "abs_delta": 4.276797471725047e-09
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.leave_one_attack_type_out.dosAttack->dataReplay.models.random_forest.mean_std_across_training_seeds.auroc.mean",
+      "first": 0.5523089903482626,
+      "second": 0.5523089805840412,
+      "abs_delta": 9.764221431396436e-09
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.leave_one_attack_type_out.dosAttack->dataReplay.models.random_forest.mean_std_across_training_seeds.auroc.std",
+      "first": 0.012009486356315883,
+      "second": 0.01200949454301098,
+      "abs_delta": 8.186695097875396e-09
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.leave_one_attack_type_out.dosAttack->dataReplay.models.random_forest.mean_std_across_training_seeds.validation_f1_threshold.std",
+      "first": 0.025546204031796877,
+      "second": 0.02554620403179684,
+      "abs_delta": 3.8163916471489756e-17
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.leave_one_attack_type_out.dosAttack->dataReplay.models.random_forest.per_seed[0].validation_f1_threshold",
+      "first": 0.6931035870778222,
+      "second": 0.6931035870778223,
+      "abs_delta": 1.1102230246251565e-16
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.leave_one_attack_type_out.dosAttack->dataReplay.models.random_forest.per_seed[3].auroc",
+      "first": 0.5442536385394601,
+      "second": 0.544253589718353,
+      "abs_delta": 4.882110704595988e-08
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.sender_disjoint_holdout.models.random_forest.mean_std_across_training_seeds.validation_f1_threshold.std",
+      "first": 0.010124829564539833,
+      "second": 0.010124829564539849,
+      "abs_delta": 1.5612511283791264e-17
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.sender_disjoint_holdout.models.random_forest.per_seed[1].validation_f1_threshold",
+      "first": 0.48361303551584184,
+      "second": 0.4836130355158418,
+      "abs_delta": 5.551115123125783e-17
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "models.random_forest.mean_std_across_training_seeds.average_precision.std",
+      "first": 7.71238950872524e-05,
+      "second": 7.712389508723851e-05,
+      "abs_delta": 1.3891340334970526e-17
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "models.random_forest.mean_std_across_training_seeds.validation_f1_threshold.std",
+      "first": 0.03130403939856551,
+      "second": 0.031304039398565506,
+      "abs_delta": 6.938893903907228e-18
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "models.random_forest.per_seed[1].validation_f1_threshold",
+      "first": 0.49029411910713805,
+      "second": 0.4902941191071381,
+      "abs_delta": 5.551115123125783e-17
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "models.random_forest.per_seed[3].average_precision",
+      "first": 0.9884263390679405,
+      "second": 0.9884263390679404,
+      "abs_delta": 1.1102230246251565e-16
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "per_attack_category.dataReplay.models.random_forest.mean_std_across_training_seeds.validation_f1_threshold.std",
+      "first": 0.02866654767049139,
+      "second": 0.028666547670491337,
+      "abs_delta": 5.204170427930421e-17
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "per_attack_category.dosAttack.models.random_forest.mean_std_across_training_seeds.auroc.std",
+      "first": 5.5105041081506986e-05,
+      "second": 5.510504108151887e-05,
+      "abs_delta": 1.1885566315872342e-17
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "per_attack_category.dosAttack.models.random_forest.mean_std_across_training_seeds.validation_f1_threshold.std",
+      "first": 0.0901108318158341,
+      "second": 0.09011083181583406,
+      "abs_delta": 4.163336342344337e-17
     }
   ],
-  "how_to_complete": "run `corridor-reproduce` with sufficient free memory"
+  "nonzero_deltas_truncated": false,
+  "non_numeric_mismatches": [],
+  "checkpoint_sha256": {
+    "compared": 230,
+    "identical": 230,
+    "different": []
+  },
+  "derived_file_sha256": {
+    "seed_metrics.csv": {
+      "first_sha256": "d616cde6c035b0ff2834d8b0f6ba3319012ba55fd785b409defc4e339a4660f9",
+      "second_sha256": "133508b96e2a606f60cace860685ceb032b4cc128736b8ed779a9ac5061f2f65",
+      "identical": false
+    },
+    "bootstrap_preview.csv": {
+      "first_sha256": "4b07766a98df4dcd759a9de4c101fc736350c54198de5229271787ea7bd56a08",
+      "second_sha256": "4b07766a98df4dcd759a9de4c101fc736350c54198de5229271787ea7bd56a08",
+      "identical": true
+    },
+    "results_table.tex": {
+      "first_sha256": "8e6658354654fca5bd70ad8b2fcac1ee7af74c192a7cc1c61867da9a7e1d2cc8",
+      "second_sha256": "8e6658354654fca5bd70ad8b2fcac1ee7af74c192a7cc1c61867da9a7e1d2cc8",
+      "identical": true
+    },
+    "results_operating_points.tex": {
+      "first_sha256": "46d495cbe56e4410faaa2a5ca50bfe3001e8d6733a08ede17710f5c1e784e96f",
+      "second_sha256": "46d495cbe56e4410faaa2a5ca50bfe3001e8d6733a08ede17710f5c1e784e96f",
+      "identical": true
+    },
+    "results_bootstrap.tex": {
+      "first_sha256": "7492fc9db9537ac6e1694b47d479210afb0b1aa9a2040172c3befbab593ca0d4",
+      "second_sha256": "7492fc9db9537ac6e1694b47d479210afb0b1aa9a2040172c3befbab593ca0d4",
+      "identical": true
+    },
+    "results_generalization.tex": {
+      "first_sha256": "fca7b63e4a72ad301b615cf51f74b538af6ad46a7cd226c96fa8776c85978200",
+      "second_sha256": "fca7b63e4a72ad301b615cf51f74b538af6ad46a7cd226c96fa8776c85978200",
+      "identical": true
+    },
+    "results_ablation.tex": {
+      "first_sha256": "e8c69f054d863f987f64504c661384a129c11c7c8a99f5785ee9930313f90b71",
+      "second_sha256": "e8c69f054d863f987f64504c661384a129c11c7c8a99f5785ee9930313f90b71",
+      "identical": true
+    },
+    "results_macros.tex": {
+      "first_sha256": "bbe08a0b2c1edc46bd6cdcc7fe3515e8fcdd8ea638603a559f6b084fb3f26193",
+      "second_sha256": "bbe08a0b2c1edc46bd6cdcc7fe3515e8fcdd8ea638603a559f6b084fb3f26193",
+      "identical": true
+    }
+  },
+  "timing_fields_excluded": 797,
+  "timing_exclusion_rule": [
+    "inference_ms_per_event",
+    "runtime_seconds",
+    "training_seconds"
+  ],
+  "temporary_directory_deleted": true,
+  "scope": "Same machine, same interpreter, same library versions, CPU only. The status does not establish determinism across hardware or library versions.",
+  "environment": {
+    "python": "3.12.9",
+    "numpy": "2.5.5",
+    "scikit_learn": "1.9.1",
+    "torch": "2.15.0+cpu",
+    "platform": "win32"
+  }
 }
