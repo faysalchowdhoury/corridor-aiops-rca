@@ -1,8 +1,8 @@
 {
-  "generated_at_utc": "2026-11-27T07:58:20.595090+00:00",
+  "generated_at_utc": "2026-11-27T21:47:00.097544+00:00",
   "procedure": "git clone of the committed repository into a temporary directory; official-split benchmark rerun from the clone (PYTHONPATH set to the clone's src); per-seed headline metrics compared with the committed results; ruff and pytest run on Linux (WSL) from a separate clone of the same commit",
-  "commit": "5f7d078fa6acba11f1fe2b8be988cc3451f7ef2e",
-  "linux_commit": "727a53d2d97590e82c50c853004d0decae78d494",
+  "commit": "d54fc6d97a82470d0fe1bcb4d7595fe4f0e16005",
+  "linux_commit": "d54fc6d97a82470d0fe1bcb4d7595fe4f0e16005",
   "clone_dir": "temporary git clone (scratch directory, deleted after the audit)",
   "command": "PYTHONPATH=<clone>/src python -m corridor_aiops.evaluation.benchmark --train-seeds 5 --bootstrap-samples 1000 --bootstrap-preview-rows 20 --epochs 5 --skip-generalization --skip-ablations",
   "models": 9,
@@ -21,7 +21,7 @@
     "tolerance": 1e-06,
     "per_seed_values_compared": 360,
     "values_over_tolerance": 0,
-    "max_abs_delta": 1.1102230246251565e-16,
+    "max_abs_delta": 0.0,
     "checkpoint_hashes_matched": 45,
     "checkpoint_hashes_compared": 45,
     "bootstrap_interval_max_abs_delta": 0.0,
@@ -43,9 +43,9 @@
       "command": "pytest",
       "exit_code": 0,
       "status": "PASSED",
-      "summary_line": "80 passed in 6.82s"
+      "summary_line": "93 passed in 8.52s"
     }
   },
   "scope_note": "Covers the official-split headline comparison only; generalization and ablation contexts are covered by results/reproduction_audit.json. Not a bit-identical determinism claim.",
-  "code_difference_between_commits": "benchmark, model, sequence-model, and data code is identical between the headline commit and the Linux-check commit except for one reformatted function signature in src/corridor_aiops/data/parse.py (git diff 5f7d078 727a53d)"
+  "code_difference_between_commits": "the audited commit d54fc6d is followed by one commit that records this audit; benchmark, model, and data code is identical between them (git diff d54fc6d -- src/corridor_aiops/data src/corridor_aiops/models src/corridor_aiops/evaluation/benchmark.py is empty); the later commit changes manuscript prose, regenerated documents, and one figure column label in src/corridor_aiops/evaluation/figures.py"
 }

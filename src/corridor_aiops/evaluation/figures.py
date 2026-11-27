@@ -838,7 +838,8 @@ def _contexts(summary: dict[str, Any]) -> list[tuple[str, dict[str, Any] | None,
     generalization = summary.get("generalization", {})
     for direction, block in generalization.get("leave_one_attack_type_out", {}).items():
         source, target = direction.split("->")
-        label = f"LOAO\n{short.get(source, source)} to {short.get(target, target)}"
+        # Three lines keep adjacent LOAO headers from colliding at column width.
+        label = f"LOAO\n{short.get(source, source)}\nto {short.get(target, target)}"
         if block["status"] == "EVALUABLE":
             contexts.append((label, block["models"], None))
         else:
