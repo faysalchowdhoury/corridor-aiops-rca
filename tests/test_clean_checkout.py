@@ -42,3 +42,28 @@ def test_missing_model_is_not_reported_as_reproduced() -> None:
 
     assert result["status"] == "DIFFERS"
     assert result["models_missing"] == ["m"]
+
+
+def test_generated_sentence_is_valid_latex_text(tmp_path) -> None:
+    from corridor_aiops.evaluation.clean_checkout import write_sentence
+
+    audit = {
+        "commit": "a" * 40,
+        "linux_commit": "b" * 40,
+        "models": 9,
+        "training_seeds": 5,
+        "headline_reproduction": compare_headline(_summary(), _summary()),
+        "linux_environment": {"platform": "Ubuntu", "python": "3.12"},
+        "linux_checks": {
+            "ruff": {"status": "PASSED", "summary_line": "All checks passed!"},
+            "pytest": {"status": "PASSED", "summary_line": "80 passed in 9.0s"},
+        },
+    }
+    path = tmp_path / "macros.tex"
+
+    write_sentence(audit, path)
+    text = path.read_text(encoding="utf-8")
+
+    assert "\t" not in text
+    assert text.count("\\texttt{") == 4
+    assert "aaaaaaa" in text and "bbbbbbb" in text

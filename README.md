@@ -20,10 +20,15 @@ This repository evaluates simulated V2X misbehavior detection on the published V
 | XGBoost | NOT_RUN unless the optional `xgboost` package is installed | `models_not_run` |
 | Training-seed variability | 5 seeds, mean and sample std | `mean_std_across_training_seeds`, `results/seed_metrics.csv` |
 | Sender-cluster bootstrap | 1,000 paired replicates, 95% percentile CIs, paired deltas | `uncertainty.sender_cluster_bootstrap` |
+| Per-seed bootstrap sensitivity | bootstrap repeated for each of the 5 training seeds on identical resamples | `results/seed_bootstrap_sensitivity.json`, `results/results_seed_bootstrap.tex` |
 | Matched FAR operating points | 1% and 5% budgets | `test_roc_tpr_at_far_*`, `validation_calibrated_*` |
 | Per-attack, LOAO, sender-disjoint holdout | evaluated or `NOT_EVALUABLE` with reason | `per_attack_category`, `generalization` |
+| LOAO reversal diagnosis | feature directions by category, benign shift, ground-truth outcome subgroups, confusion matrices | `results/loao_diagnostics.json` |
+| Held-out scenario `InTAS_urban_2` | evaluated: official test split only, no fitting or selection on it, MD5 verified | `results/heldout_scenario.json` |
+| Held-out `InTAS_highway_7`, `InTAS_urban_7` | NOT_EVALUATED (archive size versus the evaluation machine) | `results/heldout_scenario.json` (`not_evaluated`) |
 | Five feature and temporal ablations | Tabular Transformer and top supervised baseline | `results/ablation_summary.json` |
-| Second-run reproduction | measured comparison, not assumed | `results/reproduction_audit.json` |
+| Second-run reproduction | numerically reproducible within 1e-6, not bit-identical | `results/reproduction_audit.json` |
+| Clean-checkout reproduction and Linux checks | headline rerun from a fresh clone; ruff and pytest on WSL Ubuntu | `results/clean_checkout_audit.json` |
 | CorridorLogTransformer, StaticGCN, AsyncSTGNN | architecture-only, **not evaluated** | `results/model_eligibility_matrix.json` |
 | Causal RCA, work-zone FAR, cross-modal fusion, field MTTD | NOT_EVALUABLE | `results/dataset_capability_matrix.json` |
 
@@ -57,13 +62,16 @@ Both archives replay the same InTAS vehicle population, so every test `source_id
 
 Values are mean ± sample std over training seeds; TPR is read from the test ROC at 1% FPR. Logistic regression and histogram gradient boosting are seed-invariant as configured, so their std is exactly zero.
 
-* **Composite sender-cluster bootstrap** (1,000 of 1,000 valid replicates, 952 clusters): random forest and gradient boosting beat the Tabular Transformer, with paired ΔF1 and ΔAUROC 95% intervals entirely below zero. The Transformer beats every unsupervised model, logistic regression, and the MLP.
+* **Composite sender-cluster bootstrap** (1,000 of 1,000 valid replicates, 952 clusters): random forest and gradient boosting beat the Tabular Transformer, with paired ΔF1 and ΔAUROC 95% intervals entirely below zero. For the first seed the Transformer also beats every unsupervised model, logistic regression, and the MLP.
+* **Per-seed bootstrap sensitivity:** repeating the bootstrap for each training seed, 13 of 16 paired verdicts are stable. Random forest and gradient boosting beat the Transformer, and the Transformer beats all unsupervised models, for every seed. Its margins over logistic regression (F1) and the MLP (F1 and AUROC) depend on the seed and are not established. Bootstrap replicates are resamples of one set of test senders, not independent experiments.
 * **Sender-disjoint holdout** (zero composite overlap, 169 test senders): supervised AUROC stays at 0.992 to 0.996.
-* **Leave-one-attack-type-out:** supervised detectors fall to or near chance AUROC in 7 of 10 model and direction pairs (for example, gradient boosting 0.280 on `dataReplay` to `dosAttack`). They do not transfer across attack types.
+* **Leave-one-attack-type-out:** supervised detectors fall below AUROC 0.6 in 7 of 10 model and direction pairs (for example, gradient boosting 0.280 on `dataReplay` to `dosAttack`, where it recalls 0.8% of flood messages at its source threshold). The detectors are attack-specific, not attack-general.
+* **Why LOAO fails (central finding):** the two attacks are marked by different features. Displacement, speed change, and heading change are larger for replay attackers (single-feature AUROC 0.58 to 0.60) but near zero for flood messages (0.15 to 0.16), and timing separates only the flood (inter-arrival AUROC 0.001). Non-malicious traffic is identical across archives (cross-archive AUROC 0.476 to 0.508), and `dosAttack` attacker messages with genuine content (sender-level labels) are detected and mis-ranked like injected ones, so neither benign shift nor labels explain the reversal.
+* **Held-out scenario (`InTAS_urban_2`, 275,813 test messages):** highway 2 models applied unchanged keep their ranking (random forest AUROC 0.996, Transformer 0.993) and the same model ordering; thresholds transfer less exactly (Transformer FAR 5.04% versus 3.82% on highway 2). Same attacks and simulator, so this is scenario transfer, not attack transfer.
 * **Ablations:** a single-message window and raw coordinates cost 0.03 to 0.07 AUROC and more than 0.1 TPR at 1% FAR. Removing timing and jitter features hurts the Transformer only. Density and masks have small effects.
 * **Sender ranking:** attacker-emitter recall at k = 3 is at most 1.58%, so message detection does not imply emitter identification.
 
-See `results/reproduction_audit.json` for the second-run audit status. Its current status is `NOT_COMPLETED`: two attempts did not finish (a terminated session, then an out-of-memory error while other workloads shared the machine), so no determinism claim is made. `corridor-reproduce` completes the audit on a machine with enough free memory.
+`results/reproduction_audit.json` records the completed second run: 24 of 55,844 numeric values differed, all below 1e-6 and all from random forest, so the outputs are numerically reproducible within that tolerance but not bit-identical. `results/clean_checkout_audit.json` records the clean-clone headline rerun and the Linux ruff and pytest results. No bit-identical determinism claim is made.
 
 ## Quick start
 
@@ -81,6 +89,11 @@ corridor-benchmark --train-seeds 5 --bootstrap-samples 1000 --bootstrap-preview-
 corridor-audit
 corridor-reproduce
 corridor-figures
+# Per-seed bootstrap and LOAO diagnostics (refits official and LOAO models, about 25 min)
+corridor-sensitivity --rerun
+# Held-out scenario: download InTAS_urban_2 test files (MD5 verified), then evaluate
+corridor-ingest --heldout-only
+corridor-heldout
 ```
 
 * `corridor-benchmark --seeds` was renamed: `--bootstrap-preview-rows` sets how many bootstrap replicates are written to `results/bootstrap_preview.csv`, and `--train-seeds` (default 5) sets the number of independent model-training seeds. `--skip-generalization` and `--skip-ablations` exist for quick runs.
@@ -100,13 +113,20 @@ The full benchmark (5 seeds, all generalization contexts and ablations) runs on 
 | `results/bootstrap_preview.csv` | first bootstrap replicates (not independent runs) |
 | `results/results_*.tex`, `results/results_macros.tex` | generated LaTeX tables and number macros used by the manuscript |
 | `results/reproduction_audit.json`, `results/reproduction_macros.tex` | second-run comparison |
-| `paper/figures/fig1..fig4` | 350 DPI PDF and PNG, white background, Times New Roman, validated colorblind-safe palette |
+| `results/seed_bootstrap_sensitivity.json`, `results/results_seed_bootstrap.tex` | per-seed bootstrap sensitivity |
+| `results/loao_diagnostics.json`, `results/results_feature_shift.tex`, `results/results_loao_confusion.tex`, `results/results_loao_subgroups.tex` | LOAO reversal diagnosis |
+| `results/heldout_scenario.json`, `results/results_heldout.tex`, `results/heldout_macros.tex` | held-out scenario evaluation |
+| `results/scores/per_seed_scores_meta.json` | SHA-256 and verification of the saved per-seed scores (`per_seed_scores.npz`, about 25 MB, regenerated locally and not committed) |
+| `results/clean_checkout_audit.json`, `results/clean_checkout_macros.tex` | clean-clone reproduction and Linux checks |
+| `results/sensitivity_macros.tex`, `results/text_macros.tex` | generated numbers quoted in the manuscript text |
+| `paper/figures/fig1..fig5` | 350 DPI PDF and PNG, white background, Times New Roman, validated colorblind-safe palette |
 
 ## Public data and provenance
 
 | Source | Acquired subset | Used for | Important limitation |
 |---|---|---|---|
-| [VeReMi NextGen, DOI 10.5281/zenodo.19665762](https://doi.org/10.5281/zenodo.19665762) | InTAS highway 2 `dataReplay` and `dosAttack` archives plus official ground-truth files | All fitting and evaluation | Simulated VANET scenario; both archives share one scenario |
+| [VeReMi NextGen, DOI 10.5281/zenodo.19665762](https://doi.org/10.5281/zenodo.19665762) | InTAS highway 2 `dataReplay` and `dosAttack` archives plus official ground-truth files | All fitting, selection, and evaluation | Simulated VANET scenario; both archives share one scenario |
+| Same record | InTAS urban 2 `dataReplay` and `dosAttack` archives and the official test ground truth | Held-out test only (official test split; nothing fit or selected on it) | Simulated; same attacks and simulator as the training scenario |
 | [USDOT Tampa CV Pilot BSM](https://data.transportation.gov/d/nm7w-nvbm) and [SPaT](https://data.transportation.gov/d/xn7c-yu2n) | Public sample records | Ingestion and format checks only | Not time-aligned with each other or VeReMi |
 | [PeMS-BAY District 4](https://github.com/benchoi93/PeMS-BAY-2022) | Five-minute station data for 2022-01-01 | Ingestion checks only | No incident or anomaly labels |
 | [Caltrans Planned Lane Closures](https://lcswebreports.dot.ca.gov/) | District 4, Alameda County, US-80 report | Ingestion checks only | Not aligned with observed traffic |

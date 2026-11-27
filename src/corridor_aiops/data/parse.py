@@ -323,9 +323,7 @@ def verify_veremi_directory(directory: Path) -> list[dict[str, Any]]:
     return results
 
 
-def veremi_events(
-    path: Path, splits: Iterable[str] | None = None
-) -> Iterator[CorridorEvent]:
+def veremi_events(path: Path, splits: Iterable[str] | None = None) -> Iterator[CorridorEvent]:
     """Read one earliest receive observation for each published BSM broadcast.
 
     ``splits`` restricts parsing to the named official splits (default: all).

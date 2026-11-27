@@ -57,6 +57,7 @@ from corridor_aiops.evaluation.tables import (
     _escape,
     _write,
     generalization_focus_models,
+    write_text_macros,
 )
 
 SCORES_FILE = Path("scores") / "per_seed_scores.npz"
@@ -887,6 +888,13 @@ def analyze(
         _subgroup_table(summary, diagnostics),
     )
     _write_macros(summary, sensitivity, diagnostics, meta, results_dir / "sensitivity_macros.tex")
+    ablation_path = results_dir / "ablation_summary.json"
+    write_text_macros(
+        summary,
+        json.loads(ablation_path.read_text(encoding="utf-8")) if ablation_path.exists() else None,
+        json.loads((results_dir / "dataset_capability_matrix.json").read_text(encoding="utf-8")),
+        results_dir / "text_macros.tex",
+    )
     return {"sensitivity": sensitivity, "diagnostics": diagnostics}
 
 

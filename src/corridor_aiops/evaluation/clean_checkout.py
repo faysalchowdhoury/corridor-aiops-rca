@@ -110,7 +110,10 @@ def write_sentence(audit: dict[str, Any], path: Path) -> None:
             "per-seed headline values differed by more than the tolerance; see "
             "\\texttt{results/clean\\_checkout\\_audit.json}. "
         )
-        + f"On Linux ({audit['linux_environment']['platform']}, Python "
+        + "For commit \\texttt{"
+        + audit["linux_commit"][:7]
+        + "}, on Linux ("
+        + f"{audit['linux_environment']['platform']}, Python "
         + f"{audit['linux_environment']['python']}), \\texttt{{ruff check .}} "
         + ("passed" if checks["ruff"]["status"] == "PASSED" else "failed")
         + " and \\texttt{pytest} "
@@ -131,7 +134,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--reference", type=Path, default=Path("results/benchmark_summary.json"))
     parser.add_argument("--candidate", type=Path, required=True)
-    parser.add_argument("--commit", required=True)
+    parser.add_argument("--commit", required=True, help="commit used for the headline rerun")
+    parser.add_argument("--linux-commit", required=True, help="commit used for ruff and pytest")
     parser.add_argument("--clone-dir", required=True)
     parser.add_argument("--command", required=True)
     parser.add_argument("--ruff-exit", type=int, required=True)
@@ -154,6 +158,7 @@ def main() -> None:
             "Linux (WSL) from a separate clone of the same commit"
         ),
         "commit": args.commit,
+        "linux_commit": args.linux_commit,
         "clone_dir": args.clone_dir,
         "command": args.command,
         "models": len(reference["models"]),
