@@ -145,7 +145,7 @@ The full benchmark (5 seeds, all generalization contexts and ablations) runs on 
 
 ## Paper-writing standard
 
-The manuscript follows the repository's evidence limits and the pre-submission practices summarized by [Q1-Paper-Anatomy](https://github.com/Touhid-Alam/Q1-Paper-Anatomy): map each stated gap to a method and a measured result, document provenance and split boundaries, fit preprocessing only on training data, justify baselines and metrics, and report dataset-specific limitations. No writing template guarantees acceptance.
+The manuscript follows the repository's evidence limits and standard pre-submission practices: map each stated gap to a method and a measured result, document provenance and split boundaries, fit preprocessing only on training data, justify baselines and metrics, and report dataset-specific limitations. No writing template guarantees acceptance.
 
 ## Citation
 
