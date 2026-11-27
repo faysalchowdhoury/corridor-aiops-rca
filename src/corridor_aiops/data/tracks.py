@@ -115,12 +115,10 @@ def build_v2x_graph_slices(
         raise ValueError("V2X graph construction accepts BSM events only")
 
     windows = extract_trajectory_windows(events)
-    latest: dict[tuple[str, int], dict[str, tuple[CorridorEvent, TrajectoryWindow]]] = (
-        defaultdict(dict)
+    latest: dict[tuple[str, int], dict[str, tuple[CorridorEvent, TrajectoryWindow]]] = defaultdict(
+        dict
     )
-    members: dict[tuple[str, int], dict[str, list[str]]] = defaultdict(
-        lambda: defaultdict(list)
-    )
+    members: dict[tuple[str, int], dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
     for event, window in zip(events, windows, strict=True):
         group_key = (event.corridor_id, _event_time_ns(event) // slice_width_ns)
         members[group_key][event.source_id].append(event.event_id)
@@ -289,9 +287,7 @@ def write_model_eligibility_matrix(
             raise ValueError("Benchmark summary must contain a models object")
         benchmark_models = benchmark["models"]
         not_run = benchmark.get("models_not_run", {})
-        matrix["benchmark_summary_sha256"] = hashlib.sha256(
-            benchmark_path.read_bytes()
-        ).hexdigest()
+        matrix["benchmark_summary_sha256"] = hashlib.sha256(benchmark_path.read_bytes()).hexdigest()
         for model in matrix["models"]:
             name = model["name"]
             if name in benchmark_models:

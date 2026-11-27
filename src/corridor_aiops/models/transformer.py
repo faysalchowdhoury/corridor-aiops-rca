@@ -167,9 +167,7 @@ class TabularTransformer(nn.Module):
             mask=causal_mask,
             src_key_padding_mask=~safe_steps,
         )
-        last_valid = torch.where(
-            valid_steps, positions.unsqueeze(0), -1
-        ).amax(dim=-1).clamp(min=0)
+        last_valid = torch.where(valid_steps, positions.unsqueeze(0), -1).amax(dim=-1).clamp(min=0)
         pooled = states[torch.arange(batch_size, device=telemetry.device), last_valid]
         pooled = pooled * valid_steps.any(dim=-1, keepdim=True).to(pooled.dtype)
         return {

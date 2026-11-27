@@ -117,9 +117,7 @@ def _iter_veremi_archive(
                     raise ValueError(
                         f"VeReMi record has no official split in archive path: {member}"
                     )
-                record_file_id = member.replace("\\", "/").rsplit("/", 1)[-1].rsplit(
-                    ".", 1
-                )[0]
+                record_file_id = member.replace("\\", "/").rsplit("/", 1)[-1].rsplit(".", 1)[0]
                 for record_index, record in enumerate(_records_from_json(content)):
                     yield split, record_file_id, record_index, record
 
@@ -301,9 +299,7 @@ def verify_veremi_directory(directory: Path) -> list[dict[str, Any]]:
     for archive in sorted(Path(directory).glob("*.zip")):
         scenario, _ = veremi_archive_identity(archive)
         results.append(
-            cross_check_veremi_ground_truth(
-                archive, veremi_ground_truth_paths(directory, scenario)
-            )
+            cross_check_veremi_ground_truth(archive, veremi_ground_truth_paths(directory, scenario))
         )
     if not results:
         raise FileNotFoundError(f"No VeReMi archives found in {directory}")
@@ -313,9 +309,7 @@ def verify_veremi_directory(directory: Path) -> list[dict[str, Any]]:
 def veremi_events(path: Path) -> Iterator[CorridorEvent]:
     """Read one earliest receive observation for each published BSM broadcast."""
     events: dict[tuple[str, str, str], CorridorEvent] = {}
-    for split, record_file_id, record_index, record in _iter_veremi_archive(
-        path.read_bytes()
-    ):
+    for split, record_file_id, record_index, record in _iter_veremi_archive(path.read_bytes()):
         if "attacker" not in record or record["attacker"] not in (0, 1, "0", "1"):
             raise ValueError("VeReMi record is missing the official attacker label")
         try:

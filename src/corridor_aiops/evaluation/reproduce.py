@@ -21,6 +21,19 @@ from pathlib import Path
 from typing import Any
 
 TIMING_KEYS = frozenset({"inference_ms_per_event", "training_seconds", "runtime_seconds"})
+NUMERICAL_TOLERANCE = 1e-6
+MODEL_NAMES = (
+    "robust_threshold_rules",
+    "isolation_forest",
+    "one_class_svm",
+    "lstm_autoencoder",
+    "logistic_regression",
+    "random_forest",
+    "hist_gradient_boosting",
+    "xgboost",
+    "supervised_mlp",
+    "tabular_transformer",
+)
 COMPARED_JSON = ("benchmark_summary.json", "ablation_summary.json")
 COMPARED_FILES = (
     "seed_metrics.csv",
@@ -202,6 +215,8 @@ def run_reproduction_audit(
         "command": [Path(command[0]).name, *command[1:]],
         "second_run_wall_clock_seconds": elapsed,
         **comparison,
+        "numerical_tolerance": NUMERICAL_TOLERANCE,
+        "within_numerical_tolerance": comparison["max_abs_numeric_delta"] <= NUMERICAL_TOLERANCE,
         "temporary_directory_deleted": not keep,
         "scope": (
             "Same machine, same interpreter, same library versions, CPU only. The status "
@@ -247,6 +262,11 @@ def write_reproduction_macros(audit: dict[str, Any], path: Path) -> None:
         return f"{value:,}".replace(",", "{,}")
 
     files_identical = sum(item["identical"] for item in audit["derived_file_sha256"].values())
+    tolerance = audit.get("numerical_tolerance", NUMERICAL_TOLERANCE)
+    within = audit["max_abs_numeric_delta"] <= tolerance
+    affected = sorted(
+        {name for name in MODEL_NAMES for item in audit["nonzero_deltas"] if name in item["path"]}
+    )
     status = audit["determinism_status"].replace("_", " ").lower()
     sentence = (
         "The complete benchmark was run a second time in a fresh process from the same raw "
@@ -257,7 +277,22 @@ def write_reproduction_macros(audit: dict[str, Any], path: Path) -> None:
         f"absolute difference {audit['max_abs_numeric_delta']:.3g}), "
         f"{checkpoints['identical']} of {checkpoints['compared']} checkpoint SHA-256 hashes "
         f"matched, and {files_identical} of {len(audit['derived_file_sha256'])} derived tables "
-        "and CSV files were byte-identical. The comparison covers one machine and one library "
+        "and CSV files were byte-identical. "
+        + (
+            f"Every difference is below the predefined numerical tolerance of {tolerance:g}, so "
+            "the outputs are numerically reproducible within that tolerance but not "
+            "bit-identical. "
+            if within
+            else f"Some differences exceed the predefined tolerance of {tolerance:g}. "
+        )
+        + (
+            f"All differing values belong to {', '.join(a.replace('_', ' ') for a in affected)}, "
+            "whose checkpoints were identical, which is consistent with floating-point "
+            "summation order across parallel threads at prediction time. "
+            if affected and checkpoints["identical"] == checkpoints["compared"]
+            else ""
+        )
+        + "The comparison covers one machine and one library "
         "environment, recorded in \\texttt{results/reproduction\\_audit.json}."
     )
     _write_sentence(path, sentence)

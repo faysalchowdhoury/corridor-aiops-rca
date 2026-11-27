@@ -379,7 +379,7 @@ def _architecture(figure_dir: Path, summary: dict[str, Any]) -> None:
                 "dataReplay and dosAttack",
                 "official train / val / test",
                 "MD5 and SHA-256 verified",
-                "ground-truth cross-check:",
+                "ground-truth consistency audit:",
                 "  attack type = member paths",
                 "  attacker 0 = official state",
             ],

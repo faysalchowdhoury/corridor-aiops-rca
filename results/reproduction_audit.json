@@ -256,5 +256,7 @@
     "scikit_learn": "1.9.1",
     "torch": "2.15.0+cpu",
     "platform": "win32"
-  }
+  },
+  "numerical_tolerance": 1e-06,
+  "within_numerical_tolerance": true
 }

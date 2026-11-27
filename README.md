@@ -13,7 +13,7 @@ This repository evaluates simulated V2X misbehavior detection on the published V
 | Item | Status | Where it is recorded |
 |---|---|---|
 | Official VeReMi archives and ground-truth files | Zenodo MD5 and SHA-256 verified | `data/raw/manifest.json`, `results/dataset_capability_matrix.json` |
-| Embedded labels vs. official ground truth | PASSED hard cross-check (see below) | `datasets.veremi.official_ground_truth_cross_check` |
+| Embedded labels vs. official ground truth | PASSED consistency audit (see below; not full label validation) | `datasets.veremi.official_ground_truth_cross_check` |
 | Sender clusters | composite `(corridor_id, source_id)` | `composite_sender_cluster_audit` in both result files |
 | Unsupervised / one-class detectors | rules, isolation forest, one-class SVM, LSTM autoencoder | `results/benchmark_summary.json` |
 | Supervised detectors | logistic regression, random forest, histogram gradient boosting, MLP, Tabular Transformer | `results/benchmark_summary.json` |
@@ -27,7 +27,7 @@ This repository evaluates simulated V2X misbehavior detection on the published V
 | CorridorLogTransformer, StaticGCN, AsyncSTGNN | architecture-only, **not evaluated** | `results/model_eligibility_matrix.json` |
 | Causal RCA, work-zone FAR, cross-modal fusion, field MTTD | NOT_EVALUABLE | `results/dataset_capability_matrix.json` |
 
-### Official ground-truth cross-check
+### Official ground-truth consistency audit
 
 The separately published VeReMi ground-truth files contain the genuine sender state of each broadcast but **no `attacker` or attack-type field**, so labels cannot be compared one-to-one. `cross_check_veremi_ground_truth` therefore enforces the invariants the files can verify and raises `ValueError` on any violation:
 

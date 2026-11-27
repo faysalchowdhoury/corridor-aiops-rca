@@ -239,9 +239,7 @@ def extract_trajectory_windows(
                 index,
             )
         )
-        history: deque[tuple[tuple[float, ...], tuple[bool, ...]]] = deque(
-            maxlen=window_size
-        )
+        history: deque[tuple[tuple[float, ...], tuple[bool, ...]]] = deque(maxlen=window_size)
         prior_interval_sum = 0.0
         prior_interval_count = 0
         previous_event: CorridorEvent | None = None
@@ -256,9 +254,7 @@ def extract_trajectory_windows(
             mask["implausible_gap"] = True
 
             speed_valid = _metric_valid(event, "speed", "speed_valid")
-            acceleration_valid = _metric_valid(
-                event, "acceleration", "acceleration_valid"
-            )
+            acceleration_valid = _metric_valid(event, "acceleration", "acceleration_valid")
             heading_valid = _metric_valid(event, "heading", "heading_valid")
             current_speed = event.metrics.get("speed")
             current_acceleration = event.metrics.get("acceleration")
@@ -325,9 +321,7 @@ def extract_trajectory_windows(
                         previous_heading = previous_event.metrics.get("heading")
                         if previous_heading is not None:
                             angle_delta = math.radians(current_heading - previous_heading)
-                            wrapped_delta = math.atan2(
-                                math.sin(angle_delta), math.cos(angle_delta)
-                            )
+                            wrapped_delta = math.atan2(math.sin(angle_delta), math.cos(angle_delta))
                             row["heading_change_rad"] = abs(wrapped_delta)
                             mask["heading_change_rad"] = True
 

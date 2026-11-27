@@ -8,7 +8,7 @@ try:
     from torch.nn import functional as F
 except ImportError as error:  # pragma: no cover - optional extra
     raise ImportError(
-        "Install the optional PyTorch dependency with `python -m pip install -e \".[torch]\"`."
+        'Install the optional PyTorch dependency with `python -m pip install -e ".[torch]"`.'
     ) from error
 
 
@@ -69,9 +69,7 @@ class _GraphConvolutionLayer(nn.Module):
         degree = adjacency_values.sum(dim=-1).clamp(min=1.0)
         inverse_sqrt_degree = degree.rsqrt()
         normalized_adjacency = (
-            inverse_sqrt_degree.unsqueeze(2)
-            * adjacency_values
-            * inverse_sqrt_degree.unsqueeze(1)
+            inverse_sqrt_degree.unsqueeze(2) * adjacency_values * inverse_sqrt_degree.unsqueeze(1)
         )
         messages = torch.bmm(
             normalized_adjacency,
@@ -104,9 +102,7 @@ class AsyncSTGNN(nn.Module):
 
         self.feature_count = feature_count
         self.time_frequencies = time_frequencies
-        frequencies = torch.exp(
-            torch.linspace(0.0, math.log(1000.0), steps=time_frequencies)
-        )
+        frequencies = torch.exp(torch.linspace(0.0, math.log(1000.0), steps=time_frequencies))
         self.register_buffer("time_frequency", frequencies, persistent=True)
         self.telemetry_projection = nn.Linear(feature_count * 2, hidden_size)
         self.time_projection = nn.Linear(1 + time_frequencies * 2, hidden_size)
@@ -179,9 +175,9 @@ class AsyncSTGNN(nn.Module):
         ).reshape(batch_size, node_count, step_count, -1)
 
         positions = torch.arange(step_count, device=telemetry.device)
-        last_valid = torch.where(
-            step_mask.bool(), positions.view(1, 1, -1), -1
-        ).amax(dim=-1).clamp(min=0)
+        last_valid = (
+            torch.where(step_mask.bool(), positions.view(1, 1, -1), -1).amax(dim=-1).clamp(min=0)
+        )
         gather_index = last_valid[..., None, None].expand(-1, -1, 1, temporal_states.size(-1))
         node_states = temporal_states.gather(2, gather_index).squeeze(2)
         effective_node_mask = node_mask.bool() & step_mask.bool().any(dim=-1)
@@ -231,9 +227,7 @@ class StaticGCN(nn.Module):
         counts = observed.sum(dim=2).clamp(min=1.0)
         mean_values = (telemetry * observed).sum(dim=2) / counts
         observed_fraction = observed.mean(dim=2)
-        node_states = self.node_projection(
-            torch.cat((mean_values, observed_fraction), dim=-1)
-        )
+        node_states = self.node_projection(torch.cat((mean_values, observed_fraction), dim=-1))
         graph_states = self.graph_encoder(node_states, adjacency, node_mask)
         return {
             "detection_logits": self.detection_head(graph_states).squeeze(-1),

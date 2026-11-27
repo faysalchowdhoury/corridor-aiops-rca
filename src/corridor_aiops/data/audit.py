@@ -114,9 +114,7 @@ def _scan_veremi(path: Path) -> dict[str, Any]:
             positions[axis].append(float(position[axis]))
 
     slice_values = list(time_slices.values())
-    multi_vehicle_slices = [
-        rows for rows in slice_values if len(rows) >= 2
-    ]
+    multi_vehicle_slices = [rows for rows in slice_values if len(rows) >= 2]
     timelines: dict[tuple[str, str], list[tuple[int, int]]] = defaultdict(list)
     for key, label in broadcast_labels.items():
         split, sender_id, _, _ = key
@@ -136,9 +134,7 @@ def _scan_veremi(path: Path) -> dict[str, Any]:
             previous_label = label
         if split == "test" and any(label == 1 for _, label in timeline):
             test_positive_senders.add(sender_id)
-        if split in {"train", "validation"} and any(
-            label == 1 for _, label in timeline
-        ):
+        if split in {"train", "validation"} and any(label == 1 for _, label in timeline):
             train_validation_positive_senders.add(sender_id)
     return {
         "_split_sender_ids": {split: set(values) for split, values in split_senders.items()},
@@ -150,8 +146,7 @@ def _scan_veremi(path: Path) -> dict[str, Any]:
             for split, counts in sorted(split_label_counts.items())
         },
         "official_split_time_ns_min_max": {
-            split: [min(values), max(values)]
-            for split, values in sorted(split_timestamps.items())
+            split: [min(values), max(values)] for split, values in sorted(split_timestamps.items())
         },
         "unique_sender_ids_by_split": {
             split: len(values) for split, values in sorted(split_senders.items())
@@ -166,17 +161,13 @@ def _scan_veremi(path: Path) -> dict[str, Any]:
         "observed_record_fields": sorted(fields),
         "unique_sender_ids": len(senders),
         "unique_broadcasts_by_split": dict(
-            sorted(
-                Counter(key[0] for key in broadcast_receivers).items()
-            )
+            sorted(Counter(key[0] for key in broadcast_receivers).items())
         ),
         "attacker_label_counts_by_unique_broadcast": {
             split: dict(sorted(counts.items()))
             for split, counts in sorted(unique_label_counts.items())
         },
-        "attacker_label_zero_to_one_transitions_by_split": dict(
-            sorted(onset_counts.items())
-        ),
+        "attacker_label_zero_to_one_transitions_by_split": dict(sorted(onset_counts.items())),
         "test_positive_sender_ids": len(test_positive_senders),
         "test_positive_sender_ids_also_positive_in_train_or_validation": len(
             test_positive_senders & train_validation_positive_senders
@@ -199,10 +190,7 @@ def _scan_veremi(path: Path) -> dict[str, Any]:
             any(rows.values()) for rows in multi_vehicle_slices
         ),
         "max_attacker_emitters_in_one_second_slice": max(
-            (
-                sum(is_attacker for is_attacker in rows.values())
-                for rows in slice_values
-            ),
+            (sum(is_attacker for is_attacker in rows.values()) for rows in slice_values),
             default=0,
         ),
     }
@@ -299,8 +287,7 @@ def _tampa_summary(data_dir: Path) -> dict[str, Any]:
         ],
         "spat_source_ids": sorted(spat_sources),
         "spat_records_with_intersections": sum(
-            any(key.startswith("spat_intersections") for key in row)
-            for row in spat
+            any(key.startswith("spat_intersections") for key in row) for row in spat
         ),
         "bsm_spat_time_ranges_overlap": overlap,
         "source_timestamp_note": (
@@ -646,8 +633,7 @@ def run_dataset_audit(
                     "localization using published message labels."
                 ),
                 "prohibited_claim": (
-                    "Causal corridor root-cause identification or field-incident "
-                    "performance."
+                    "Causal corridor root-cause identification or field-incident performance."
                 ),
                 "holdout_eligibility": {
                     "official_time_splits": {
