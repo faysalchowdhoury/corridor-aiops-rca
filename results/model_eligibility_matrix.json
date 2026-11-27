@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "evidence_source": "results/dataset_capability_matrix.json",
-  "dataset_capability_matrix_sha256": "36d4e19b6f3d42c02380e1680b6d27671adb5c13b98f27bab8fd3bba0bbebc86",
+  "dataset_capability_matrix_sha256": "5a07b07610722bbd0a753b5bb6526fc7fa338e8c0a413488e060f4e80f95297b",
   "scope": "Eligibility reflects available labels and input modalities only. It does not imply that a model is trained, benchmarked, or validated.",
   "models": [
     {

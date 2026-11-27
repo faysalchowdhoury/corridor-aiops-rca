@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-11-27T03:32:44.061498+00:00",
-  "repository_commit_sha": "284f18130a4482d451ab4eeafe2005e46e1f15ff",
+  "generated_at_utc": "2026-11-27T06:41:03.451064+00:00",
+  "repository_commit_sha": "c6b2db966aa558f3947d4b5f8f70e9842be9f4e0",
   "audit_script": "corridor_aiops.data.audit.run_dataset_audit",
-  "audit_script_sha256": "d744939915fe057f8031cfa9c861ec8a014ade97f6b8ce4d776cd0fd3f7f6ec6",
-  "repository_worktree_dirty": true,
+  "audit_script_sha256": "b9cbad7867761c0679edfa374b6e92ff51fd6201735ac4b2819d655f675521ef",
+  "repository_worktree_dirty": false,
   "source_manifest_sha256": "7dbafc752f31e4ce5936bb8e56c729f77bf9972707d5e4938f2bfef404fc35eb",
   "verified_source_files": {
     "InTAS_highway_2_dataReplay.zip": {
