@@ -1,0 +1,18 @@
+\begin{tabular}{lcccc}
+\toprule
+Model & F1 95\% CI & AUROC 95\% CI & $\Delta$F1 95\% CI & $\Delta$AUROC 95\% CI \\
+\midrule
+\multicolumn{5}{l}{\textit{Unsupervised / one-class (fit on non-malicious records)}} \\
+Robust rules & [0.612, 0.726] & [0.764, 0.814] & [0.219, 0.308] & [0.178, 0.224] \\
+Isolation forest & [0.650, 0.752] & [0.787, 0.828] & [0.192, 0.271] & [0.164, 0.201] \\
+One-class SVM & [0.813, 0.889] & [0.862, 0.918] & [0.052, 0.110] & [0.075, 0.125] \\
+LSTM autoencoder & [0.825, 0.889] & [0.916, 0.940] & [0.054, 0.098] & [0.052, 0.073] \\
+\midrule
+\multicolumn{5}{l}{\textit{Supervised (fit on training labels)}} \\
+Logistic regression & [0.900, 0.939] & [0.980, 0.990] & [0.005, 0.020] & [0.003, 0.007] \\
+Random forest & [0.933, 0.959] & [0.990, 0.995] & [-0.021, -0.008] & [-0.004, -0.001] \\
+Hist. gradient boosting & [0.928, 0.955] & [0.990, 0.995] & [-0.016, -0.005] & [-0.004, -0.001] \\
+Supervised MLP & [0.900, 0.936] & [0.984, 0.992] & [0.010, 0.019] & [0.001, 0.004] \\
+Tabular Transformer & [0.916, 0.947] & [0.987, 0.993] & reference & reference \\
+\bottomrule
+\end{tabular}

@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
+import pytest
+
 from corridor_aiops.data.audit import _capabilities
 from corridor_aiops.data.tracks import (
+    attach_attacker_labels,
     build_model_eligibility_matrix,
     build_v2x_graph_slices,
     write_model_eligibility_matrix,
@@ -69,7 +72,8 @@ def test_v2x_graph_slices_keep_splits_and_build_local_symmetric_edges() -> None:
 
     assert set(by_corridor) == {"scenario-test", "scenario-train"}
     assert train_slice.source_ids == ("a", "b", "c")
-    assert train_slice.attacker_labels == (True, False, False)
+    train_index = [graph_slice.corridor_id for graph_slice in slices].index("scenario-train")
+    assert attach_attacker_labels(slices, events)[train_index] == (True, False, False)
     assert train_slice.windows[0].event.event_id == "a-2"
     assert train_slice.adjacency[0][1] and train_slice.adjacency[1][0]
     assert not train_slice.adjacency[0][2]
@@ -80,7 +84,7 @@ def test_model_eligibility_distinguishes_data_support_from_causal_rca() -> None:
     matrix = build_model_eligibility_matrix(_capability_matrix())
     models = {model["name"]: model for model in matrix["models"]}
 
-    assert len(models) == 8
+    assert len(models) == 13
     for model in models.values():
         tasks = model["data_task_eligibility"]
         expected_a1 = (
@@ -93,38 +97,34 @@ def test_model_eligibility_distinguishes_data_support_from_causal_rca() -> None:
         assert tasks["causal_root_cause_localization"] == "NOT_EVALUABLE"
         assert tasks["work_zone_false_alarm_rate"] == "NOT_EVALUABLE"
         assert model["evaluation_status"] == "not_evaluated_under_track_a1_protocol"
-    assert models["async_st_gnn"]["implementation_status"] == "architecture_only"
-    assert models["tabular_transformer"]["implementation_status"] == "architecture_only"
-    assert (
-        models["corridor_log_transformer"]["data_task_eligibility"]["track_a1_detection"]
-        == "NOT_EVALUABLE"
-    )
+    for name in ("async_st_gnn", "static_gcn", "corridor_log_transformer"):
+        assert models[name]["implementation_status"] == "architecture_only"
+    assert models["lstm_autoencoder"]["supervision_regime"] == "unsupervised_or_one_class"
+    assert models["random_forest"]["supervision_regime"] == "supervised"
+
+
+def _write_inputs(tmp_path, benchmark: dict):
+    capability_path = tmp_path / "capability.json"
+    capability_path.write_text(json.dumps(_capability_matrix()), encoding="utf-8")
+    (tmp_path / "benchmark_summary.json").write_text(json.dumps(benchmark), encoding="utf-8")
+    return capability_path, tmp_path / "model_eligibility.json"
 
 
 def test_eligibility_writer_records_the_audit_digest(tmp_path) -> None:
-    capability_path = tmp_path / "capability.json"
-    benchmark_path = tmp_path / "benchmark_summary.json"
-    output_path = tmp_path / "model_eligibility.json"
-    capability_path.write_text(json.dumps(_capability_matrix()), encoding="utf-8")
-    benchmark_path.write_text(
-        json.dumps(
-            {
-                "models": {
-                    "lstm_autoencoder": {},
-                    "robust_threshold_rules": {},
+    capability_path, output_path = _write_inputs(
+        tmp_path,
+        {
+            "models": {
+                "lstm_autoencoder": {
+                    "per_seed": [
+                        {"training_status": "trained_on_non_malicious_training_sequences"},
+                        {"training_status": "trained_on_non_malicious_training_sequences"},
+                    ]
                 },
-                "training": {
-                    "sequence_models": {
-                        "lstm_autoencoder": {
-                            "training_status": (
-                                "trained_on_non_malicious_official_training_sequences"
-                            )
-                        }
-                    }
-                },
-            }
-        ),
-        encoding="utf-8",
+                "robust_threshold_rules": {"per_seed": [{"training_status": "fixed_rule"}]},
+            },
+            "models_not_run": {"xgboost": "NOT_RUN: the xgboost package is not installed"},
+        },
     )
 
     result = write_model_eligibility_matrix(capability_path, output_path)
@@ -132,9 +132,16 @@ def test_eligibility_writer_records_the_audit_digest(tmp_path) -> None:
 
     assert result["dataset_capability_matrix_sha256"]
     assert json.loads(output_path.read_text(encoding="utf-8")) == result
-    assert models["lstm_autoencoder"]["implementation_status"] == "trained_sequence_baseline"
     assert models["lstm_autoencoder"]["evaluation_status"] == "evaluated_on_official_veremi_splits"
-    assert (
-        models["lstm_autoencoder"]["training_status"]
-        == "trained_on_non_malicious_official_training_sequences"
+    assert models["lstm_autoencoder"]["training_seeds"] == 2
+    assert models["xgboost"]["evaluation_status"] == "not_run"
+    assert models["async_st_gnn"]["evaluation_status"] == "not_evaluated_under_track_a1_protocol"
+
+
+def test_eligibility_writer_refuses_to_mark_architecture_only_models_evaluated(tmp_path) -> None:
+    capability_path, output_path = _write_inputs(
+        tmp_path, {"models": {"async_st_gnn": {"per_seed": [{}]}}}
     )
+
+    with pytest.raises(ValueError, match="Architecture-only"):
+        write_model_eligibility_matrix(capability_path, output_path)

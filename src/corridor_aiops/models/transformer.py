@@ -6,11 +6,17 @@ try:
     import torch
     from torch import nn
 except ImportError as error:  # pragma: no cover - optional extra
-    raise ImportError("Install the optional ML dependencies with `pip install .[ml]`.") from error
+    raise ImportError(
+        'Install the optional PyTorch dependency with `python -m pip install -e ".[torch]"`.'
+    ) from error
 
 
 class CorridorLogTransformer(nn.Module):
-    """Small multimodal event encoder for telemetry vectors and log token IDs."""
+    """Small multimodal event encoder for telemetry vectors and log token IDs.
+
+    ARCHITECTURE-ONLY: no synchronized controller-log text corpus is available in the
+    acquired evidence, so this module is not trained or benchmarked in this repository.
+    """
 
     def __init__(
         self,
@@ -31,7 +37,11 @@ class CorridorLogTransformer(nn.Module):
             batch_first=True,
             norm_first=True,
         )
-        self.sequence_encoder = nn.TransformerEncoder(encoder_layer, num_layers=layers)
+        self.sequence_encoder = nn.TransformerEncoder(
+            encoder_layer,
+            num_layers=layers,
+            enable_nested_tensor=False,
+        )
         self.classifier = nn.Linear(hidden_size, classes)
         self.mask_head = nn.Linear(hidden_size, vocabulary_size)
 
@@ -40,12 +50,47 @@ class CorridorLogTransformer(nn.Module):
         telemetry: torch.Tensor,
         token_ids: torch.Tensor,
         attention_mask: torch.Tensor | None = None,
+        *,
+        causal: bool = True,
     ) -> dict[str, Any]:
+        """Encode a padded sequence.
+
+        ``attention_mask`` is True for valid positions; when omitted, positions whose
+        token ID is the padding index 0 are treated as padding. Padding is passed to
+        the encoder as ``src_key_padding_mask``; ``causal`` adds an upper-triangular
+        mask so each position attends only to itself and earlier positions. Pooling
+        averages valid positions only.
+        """
+        if telemetry.ndim != 3 or token_ids.ndim != 2:
+            raise ValueError("telemetry must be [batch, steps, features]; tokens [batch, steps]")
+        if token_ids.shape != telemetry.shape[:2]:
+            raise ValueError("token_ids must align with telemetry steps")
+        valid = token_ids.ne(0) if attention_mask is None else attention_mask.bool()
+        if valid.shape != token_ids.shape:
+            raise ValueError("attention_mask must have shape [batch, steps]")
+        step_count = telemetry.size(1)
+        safe_valid = valid.clone()
+        safe_valid[~valid.any(dim=-1), 0] = True
+        causal_mask = (
+            torch.triu(
+                torch.ones(step_count, step_count, dtype=torch.bool, device=telemetry.device),
+                diagonal=1,
+            )
+            if causal
+            else None
+        )
         numeric = self.numeric_projection(telemetry)
         text = self.text_embedding(token_ids)
-        encoded = self.sequence_encoder(numeric + text)
+        encoded = self.sequence_encoder(
+            numeric + text,
+            mask=causal_mask,
+            src_key_padding_mask=~safe_valid,
+        )
+        weights = valid.unsqueeze(-1).to(encoded.dtype)
+        encoded = encoded * weights
+        pooled = encoded.sum(dim=1) / weights.sum(dim=1).clamp(min=1.0)
         return {
-            "logits": self.classifier(encoded.mean(dim=1)),
+            "logits": self.classifier(pooled),
             "masked_token_logits": self.mask_head(encoded),
             "hidden_states": encoded,
         }

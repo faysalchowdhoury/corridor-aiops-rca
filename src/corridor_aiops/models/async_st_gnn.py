@@ -7,7 +7,9 @@ try:
     from torch import nn
     from torch.nn import functional as F
 except ImportError as error:  # pragma: no cover - optional extra
-    raise ImportError("Install the optional ML dependencies with `pip install .[ml]`.") from error
+    raise ImportError(
+        "Install the optional PyTorch dependency with `python -m pip install -e \".[torch]\"`."
+    ) from error
 
 
 class _GATv2Layer(nn.Module):

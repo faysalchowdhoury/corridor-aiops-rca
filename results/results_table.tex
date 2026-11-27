@@ -1,11 +1,18 @@
-\begin{tabular}{lrrrr}
+\begin{tabular}{lcccc}
 \toprule
-Model & F1 & AUROC & FAR (\%) & ms/event \\
+Model & F1 & AUROC & AP & FAR (\%) \\
 \midrule
-isolation\_forest & 0.705 & 0.809 & 26.26 & 0.01844 \\
-one\_class\_svm & 0.854 & 0.891 & 2.67 & 0.14044 \\
-robust\_threshold\_rules & 0.675 & 0.789 & 29.74 & 0.00030 \\
-lstm\_autoencoder & 0.860 & 0.932 & 9.39 & 0.04006 \\
-tabular\_transformer & 0.932 & 0.990 & 3.59 & 0.05707 \\
+\multicolumn{5}{l}{\textit{Unsupervised / one-class (fit on non-malicious records)}} \\
+Robust rules & 0.675 $\pm$ 0.000 & 0.789 $\pm$ 0.000 & 0.564 $\pm$ 0.000 & 29.74 $\pm$ 0.00 \\
+Isolation forest & 0.678 $\pm$ 0.022 & 0.797 $\pm$ 0.011 & 0.542 $\pm$ 0.017 & 31.17 $\pm$ 4.64 \\
+One-class SVM & 0.854 $\pm$ 0.000 & 0.891 $\pm$ 0.000 & 0.887 $\pm$ 0.001 & 2.76 $\pm$ 0.06 \\
+LSTM autoencoder & 0.860 $\pm$ 0.000 & 0.929 $\pm$ 0.000 & 0.787 $\pm$ 0.000 & 9.35 $\pm$ 0.04 \\
+\midrule
+\multicolumn{5}{l}{\textit{Supervised (fit on training labels)}} \\
+Logistic regression & 0.921 $\pm$ 0.000 & 0.985 $\pm$ 0.000 & 0.978 $\pm$ 0.000 & 3.04 $\pm$ 0.00 \\
+Random forest & 0.946 $\pm$ 0.001 & 0.993 $\pm$ 0.000 & 0.988 $\pm$ 0.000 & 1.93 $\pm$ 0.42 \\
+Hist. gradient boosting & 0.943 $\pm$ 0.000 & 0.993 $\pm$ 0.000 & 0.988 $\pm$ 0.000 & 2.39 $\pm$ 0.00 \\
+Supervised MLP & 0.923 $\pm$ 0.005 & 0.988 $\pm$ 0.000 & 0.982 $\pm$ 0.001 & 4.14 $\pm$ 0.58 \\
+Tabular Transformer & 0.929 $\pm$ 0.004 & 0.989 $\pm$ 0.001 & 0.980 $\pm$ 0.009 & 3.82 $\pm$ 0.42 \\
 \bottomrule
 \end{tabular}

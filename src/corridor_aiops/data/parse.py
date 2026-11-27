@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
 import io
 import json
 import math
@@ -121,6 +122,192 @@ def _iter_veremi_archive(
                 )[0]
                 for record_index, record in enumerate(_records_from_json(content)):
                     yield split, record_file_id, record_index, record
+
+
+_GROUND_TRUTH_SPLIT_TOKENS = {"train": "train", "validation": "validation", "test": "test"}
+
+
+def veremi_archive_identity(path: Path) -> tuple[str, str]:
+    """Return (scenario, attack_category) from an official archive name.
+
+    ``InTAS_highway_2_dataReplay.zip`` yields ``("InTAS_highway_2", "dataReplay")``.
+    """
+    scenario, _, category = Path(path).stem.rpartition("_")
+    if not scenario or not category:
+        raise ValueError(f"VeReMi archive name does not encode an attack category: {path}")
+    return scenario, category
+
+
+def veremi_ground_truth_paths(directory: Path, scenario: str) -> dict[str, Path]:
+    """Locate the separately published per-split ground-truth JSON files."""
+    found: dict[str, Path] = {}
+    for candidate in sorted(Path(directory).glob(f"{scenario}_*.json")):
+        name = candidate.stem.lower()
+        if "ground" not in name:
+            continue
+        for split, token in _GROUND_TRUTH_SPLIT_TOKENS.items():
+            if f"_{token}_" in f"_{name}_":
+                if split in found:
+                    raise ValueError(f"Multiple {split} ground-truth files for {scenario}")
+                found[split] = candidate
+    return found
+
+
+def _ground_truth_state(record: dict[str, Any]) -> tuple[float, float, float] | None:
+    sender = record.get("sender") if isinstance(record.get("sender"), dict) else record
+    try:
+        position = sender["pos"]
+        if isinstance(position, str):
+            position = position.split(",")
+        values = (float(position[0]), float(position[1]), float(sender["spd"]))
+    except (KeyError, IndexError, TypeError, ValueError):
+        return None
+    return values if all(math.isfinite(value) for value in values) else None
+
+
+def _broadcast_key(split: str, record: dict[str, Any]) -> tuple[str, str, str, str]:
+    return (
+        split,
+        str(record.get("sender_id", "")),
+        str(record.get("messageID", "")),
+        str(record.get("sendTime", "")),
+    )
+
+
+def _nested_member_names(payload: bytes, prefix: str = "") -> Iterator[str]:
+    with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+        for member in archive.namelist():
+            yield prefix + member
+            if member.lower().endswith(".zip"):
+                yield from _nested_member_names(archive.read(member), prefix + member + "/")
+
+
+def cross_check_veremi_ground_truth(
+    archive_path: Path,
+    ground_truth_paths: dict[str, Path],
+    *,
+    tolerance: float = 1e-6,
+) -> dict[str, Any]:
+    """Cross-check embedded VeReMi labels against the official ground-truth files.
+
+    The published InTAS ground-truth files list the genuine (unmanipulated) state of
+    each broadcast but carry no ``attacker`` or attack-type field. The verifiable
+    invariants are therefore:
+
+    1. attack type: the category in the archive file name equals the category in
+       every nested member path;
+    2. every ``attacker == 0`` record exists in the same split's ground truth with
+       matching sender position and speed (within ``tolerance``);
+    3. if a ground-truth record does carry an ``attacker`` field, it equals the
+       embedded label.
+
+    Any violation raises ``ValueError``. Attacker-labeled records are summarized
+    descriptively because manipulated or injected messages are expected to diverge.
+    """
+    archive_path = Path(archive_path)
+    scenario, category = veremi_archive_identity(archive_path)
+    missing = {"train", "validation", "test"} - set(ground_truth_paths)
+    if missing:
+        raise ValueError(f"Missing official ground-truth files for splits: {sorted(missing)}")
+    payload = archive_path.read_bytes()
+
+    member_categories: set[str] = set()
+    for name in _nested_member_names(payload):
+        for component in name.split("/"):
+            stem = component[:-4] if component.lower().endswith(".zip") else component
+            if stem.startswith(f"{scenario}_"):
+                member_categories.add(stem[len(scenario) + 1 :])
+    if member_categories != {category}:
+        raise ValueError(
+            f"Attack-type mismatch in {archive_path.name}: file name says {category!r}, "
+            f"member paths say {sorted(member_categories)}"
+        )
+
+    ground_truth: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    file_digests = {}
+    for split, path in sorted(ground_truth_paths.items()):
+        raw = Path(path).read_bytes()
+        file_digests[split] = hashlib.sha256(raw).hexdigest()
+        for record in _records_from_json(raw):
+            ground_truth[_broadcast_key(split, record)] = record
+
+    counts: dict[str, dict[str, int]] = {}
+    violations: list[str] = []
+    for split, _, _, record in _iter_veremi_archive(payload):
+        if record.get("attacker") not in (0, 1, "0", "1"):
+            raise ValueError("VeReMi record is missing the official attacker label")
+        label = int(record["attacker"])
+        bucket = counts.setdefault(split, {})
+        reference = ground_truth.get(_broadcast_key(split, record))
+        if reference is not None and "attacker" in reference:
+            if int(reference["attacker"]) != label:
+                violations.append(f"{split}: ground-truth attacker label differs")
+        if reference is None:
+            outcome = "no_ground_truth_broadcast"
+        else:
+            embedded = _ground_truth_state(record)
+            official = _ground_truth_state(reference)
+            same = (
+                embedded is not None
+                and official is not None
+                and all(
+                    abs(left - right) <= tolerance
+                    for left, right in zip(embedded, official, strict=True)
+                )
+            )
+            outcome = "payload_matches" if same else "payload_differs"
+        key = f"attacker_{label}_{outcome}"
+        bucket[key] = bucket.get(key, 0) + 1
+        if label == 0 and outcome != "payload_matches":
+            violations.append(
+                f"{split}: attacker=0 record {outcome} (sender {record.get('sender_id')})"
+            )
+    if violations:
+        raise ValueError(
+            f"Official ground-truth cross-check failed for {archive_path.name} "
+            f"({len(violations)} violations): " + "; ".join(violations[:20])
+        )
+    summary = {
+        "archive": archive_path.name,
+        "scenario": scenario,
+        "attack_category": category,
+        "attack_category_member_paths": sorted(member_categories),
+        "ground_truth_files": {
+            split: Path(path).name for split, path in sorted(ground_truth_paths.items())
+        },
+        "ground_truth_sha256": file_digests,
+        "ground_truth_has_attacker_field": any(
+            "attacker" in record for record in ground_truth.values()
+        ),
+        "record_outcomes_by_split": {
+            split: dict(sorted(bucket.items())) for split, bucket in sorted(counts.items())
+        },
+        "hard_checks": [
+            "attack category in file name equals nested member paths",
+            "every attacker=0 record matches its same-split official ground-truth state",
+            "embedded attacker equals ground-truth attacker where that field exists",
+        ],
+        "status": "PASSED",
+    }
+    summary["cross_check_sha256"] = hashlib.sha256(
+        json.dumps(summary, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    return summary
+
+
+def verify_veremi_directory(directory: Path) -> list[dict[str, Any]]:
+    """Run :func:`cross_check_veremi_ground_truth` for every archive in a directory."""
+    results = []
+    for archive in sorted(Path(directory).glob("*.zip")):
+        scenario, _ = veremi_archive_identity(archive)
+        results.append(
+            cross_check_veremi_ground_truth(
+                archive, veremi_ground_truth_paths(directory, scenario)
+            )
+        )
+    if not results:
+        raise FileNotFoundError(f"No VeReMi archives found in {directory}")
+    return results
 
 
 def veremi_events(path: Path) -> Iterator[CorridorEvent]:

@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "generated_at_utc": "2026-11-27T00:06:56.376679+00:00",
-  "repository_commit_sha": "24b6550b596f159641fd90fe51b04153805fd2f7",
+  "generated_at_utc": "2026-11-27T03:32:44.061498+00:00",
+  "repository_commit_sha": "284f18130a4482d451ab4eeafe2005e46e1f15ff",
   "audit_script": "corridor_aiops.data.audit.run_dataset_audit",
-  "audit_script_sha256": "9b35eeadab2d9759853e0a70bac79c568513ac89083857c695233914d1e02902",
+  "audit_script_sha256": "d744939915fe057f8031cfa9c861ec8a014ade97f6b8ce4d776cd0fd3f7f6ec6",
   "repository_worktree_dirty": true,
   "source_manifest_sha256": "7dbafc752f31e4ce5936bb8e56c729f77bf9972707d5e4938f2bfef404fc35eb",
   "verified_source_files": {
@@ -117,6 +117,11 @@
             "train": 482,
             "validation": 152
           },
+          "composite_sender_clusters_by_split": {
+            "test": 476,
+            "train": 482,
+            "validation": 152
+          },
           "sender_ids_shared_between_train_and_test": 180,
           "archive_attack_category": "dataReplay",
           "observed_record_fields": [
@@ -226,6 +231,11 @@
             "train": 482,
             "validation": 152
           },
+          "composite_sender_clusters_by_split": {
+            "test": 476,
+            "train": 482,
+            "validation": 152
+          },
           "sender_ids_shared_between_train_and_test": 180,
           "archive_attack_category": "dosAttack",
           "observed_record_fields": [
@@ -295,6 +305,121 @@
       "official_split_note": "Train, validation, and test are the official paths inside each published archive. Their raw simulator-time ranges and sender-ID overlap are recorded per archive; no overlapping random test subsamples are treated as independent corridor-days.",
       "receive_observation_note": "The raw files repeat a sender/messageID/sendTime broadcast across receiver files. Trajectory parsing keeps the earliest receive observation per broadcast and preserves its integer nanosecond time.",
       "documentation_url": "https://github.com/VeReMi-dataset/VeReMi-NextGen/blob/main/Documentation/README.md",
+      "composite_sender_cluster_audit": {
+        "cluster_identity": "(corridor_id, source_id), corridor_id = <archive>-<split>",
+        "unique_composite_clusters_by_split": {
+          "test": 952,
+          "train": 964,
+          "validation": 304
+        },
+        "cross_archive_source_id_collisions_by_split": {
+          "test": 476,
+          "train": 482,
+          "validation": 152
+        },
+        "train_test_sender_overlap_by_archive": {
+          "InTAS_highway_2_dataReplay.zip": {
+            "train_test_same_archive_source_id_overlap": 180,
+            "train_validation_same_archive_source_id_overlap": 2
+          },
+          "InTAS_highway_2_dosAttack.zip": {
+            "train_test_same_archive_source_id_overlap": 180,
+            "train_validation_same_archive_source_id_overlap": 2
+          }
+        },
+        "unique_bare_source_ids_across_archives_and_splits": 841,
+        "interpretation": "Both archives replay the same InTAS highway 2 vehicle population, so equal source_id strings across archives are kept as distinct composite clusters."
+      },
+      "official_ground_truth_cross_check": {
+        "status": "PASSED",
+        "note": "The official per-split ground-truth JSON files contain no attacker or attack-type field. Hard checks: archive attack category equals every nested member path; every attacker=0 record matches its same-split official ground-truth position and speed; embedded attacker equals any ground-truth attacker field. A violation raises ValueError.",
+        "archives": [
+          {
+            "archive": "InTAS_highway_2_dataReplay.zip",
+            "scenario": "InTAS_highway_2",
+            "attack_category": "dataReplay",
+            "attack_category_member_paths": [
+              "dataReplay"
+            ],
+            "ground_truth_files": {
+              "test": "InTAS_highway_2_Test_ground_truth.json",
+              "train": "InTAS_highway_2_Train_groundTruth.json",
+              "validation": "InTAS_highway_2_Validation_groundTruth.json"
+            },
+            "ground_truth_sha256": {
+              "test": "445e862942c3ecf4a9957f68a61518524c95d6cae78bfaee0f9846e95306c67b",
+              "train": "484037d8cf4ce7586c26d5ac0371bec8c690e5a54c11c2e0fea2f45b38a2aa17",
+              "validation": "57fc03947f791eb8e60db8d078f0cfb03b632f3fd5d7e2dd8555318129fea383"
+            },
+            "ground_truth_has_attacker_field": false,
+            "record_outcomes_by_split": {
+              "test": {
+                "attacker_0_payload_matches": 35516,
+                "attacker_1_payload_differs": 8743
+              },
+              "train": {
+                "attacker_0_payload_matches": 31160,
+                "attacker_1_payload_differs": 6541
+              },
+              "validation": {
+                "attacker_0_payload_matches": 14765,
+                "attacker_1_payload_differs": 3212
+              }
+            },
+            "hard_checks": [
+              "attack category in file name equals nested member paths",
+              "every attacker=0 record matches its same-split official ground-truth state",
+              "embedded attacker equals ground-truth attacker where that field exists"
+            ],
+            "status": "PASSED",
+            "cross_check_sha256": "3c7d7025b497ca8e891dbb06b3c5eeb1f97e7c0d8278f28770fa02fe278d7a57"
+          },
+          {
+            "archive": "InTAS_highway_2_dosAttack.zip",
+            "scenario": "InTAS_highway_2",
+            "attack_category": "dosAttack",
+            "attack_category_member_paths": [
+              "dosAttack"
+            ],
+            "ground_truth_files": {
+              "test": "InTAS_highway_2_Test_ground_truth.json",
+              "train": "InTAS_highway_2_Train_groundTruth.json",
+              "validation": "InTAS_highway_2_Validation_groundTruth.json"
+            },
+            "ground_truth_sha256": {
+              "test": "445e862942c3ecf4a9957f68a61518524c95d6cae78bfaee0f9846e95306c67b",
+              "train": "484037d8cf4ce7586c26d5ac0371bec8c690e5a54c11c2e0fea2f45b38a2aa17",
+              "validation": "57fc03947f791eb8e60db8d078f0cfb03b632f3fd5d7e2dd8555318129fea383"
+            },
+            "ground_truth_has_attacker_field": false,
+            "record_outcomes_by_split": {
+              "test": {
+                "attacker_0_payload_matches": 36066,
+                "attacker_1_no_ground_truth_broadcast": 16459,
+                "attacker_1_payload_matches": 8193
+              },
+              "train": {
+                "attacker_0_payload_matches": 29569,
+                "attacker_1_no_ground_truth_broadcast": 17589,
+                "attacker_1_payload_matches": 8132
+              },
+              "validation": {
+                "attacker_0_payload_matches": 14162,
+                "attacker_1_no_ground_truth_broadcast": 8144,
+                "attacker_1_payload_matches": 3815
+              }
+            },
+            "hard_checks": [
+              "attack category in file name equals nested member paths",
+              "every attacker=0 record matches its same-split official ground-truth state",
+              "embedded attacker equals ground-truth attacker where that field exists"
+            ],
+            "status": "PASSED",
+            "cross_check_sha256": "df4ff7d18cda0e46a02ebe8d05b327eb85e4fdee8bb1c715491784340c92ebf7"
+          }
+        ],
+        "combined_cross_check_sha256": "916eec84699157cbe9c97839bf2aa8f7951f70ccdb55498a0810d447858257e8"
+      },
       "metrics": {
         "detection": {
           "status": "EVALUABLE",
@@ -657,6 +782,11 @@
             "dosAttack"
           ],
           "note": "Only the acquired dataReplay and dosAttack subsets are available for cross-category holdout."
+        },
+        "sender_disjoint_holdout": {
+          "status": "EVALUABLE",
+          "cluster_identity": "(corridor_id, source_id); partition by source_id",
+          "note": "Senders are partitioned by bare source_id across both archives and all official splits, which implies zero composite (corridor_id, source_id) overlap. Official temporal split boundaries are not preserved by this partition."
         },
         "independent_scenario_holdout": {
           "status": "NOT_EVALUABLE",

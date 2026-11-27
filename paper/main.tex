@@ -3,14 +3,29 @@
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{url}
+\usepackage{amsmath}
 \usepackage{etoolbox}
+\usepackage{placeins}
+
+% Allow several double-column floats per page so figures and tables stay near their
+% text, and flush every float before the bibliography.
+\setcounter{dbltopnumber}{3}
+\renewcommand{\dbltopfraction}{0.95}
+\renewcommand{\dblfloatpagefraction}{0.6}
+\setcounter{topnumber}{3}
+\renewcommand{\topfraction}{0.95}
+\renewcommand{\textfraction}{0.05}
+\renewcommand{\floatpagefraction}{0.6}
 
 \makeatletter
-\patchcmd{\abstract}{\textit{\abstractname}---\relax}{\textit{\abstractname}:\relax}{}{\PackageError{CorridorAIOps-RCA}{Could not set the abstract label separator}{Check the IEEEtran abstract definition}}
-\patchcmd{\IEEEkeywords}{\textit{\IEEEkeywordsname}---\relax}{\textit{\IEEEkeywordsname}:\relax}{}{\PackageError{CorridorAIOps-RCA}{Could not set the index-terms label separator}{Check the IEEEtran keyword definition}}
+\patchcmd{\abstract}{\textit{\abstractname}---\relax}{\textit{\abstractname}:\ \relax}{}{\PackageError{CorridorAIOps-RCA}{Could not set the abstract label separator}{Check the IEEEtran abstract definition}}
+\patchcmd{\IEEEkeywords}{\textit{\IEEEkeywordsname}---\relax}{\textit{\IEEEkeywordsname}:\ \relax}{}{\PackageError{CorridorAIOps-RCA}{Could not set the index-terms label separator}{Check the IEEEtran keyword definition}}
 \makeatother
 
-\title{Evidence-Limited Misbehavior Detection for Connected-Vehicle Telemetry}
+\input{../results/results_macros.tex}
+\input{../results/reproduction_macros.tex}
+
+\title{Evidence-Limited Misbehavior Detection for Connected-Vehicle Telemetry Using Causal Trajectory Features and Sender-Cluster Evaluation}
 \author{Faysal A. Chowdhoury%
 \thanks{Faysal A. Chowdhoury is with the Department of Civil Engineering Technology, Environmental Management and Safety, Rochester Institute of Technology, Rochester, NY, USA.}}
 
@@ -19,106 +34,166 @@
 \bstctlcite{NoRepeatedAuthorDash}
 
 \begin{abstract}
-Connected-vehicle telemetry creates a distributed event-stream monitoring problem, but public traffic datasets rarely provide synchronized field labels for cyber-physical root-cause evaluation. This paper reports an evidence-limited Track A1 study using the published VeReMi NextGen InTAS highway 2 traces. The parser collapses repeated receiver-file copies while preserving integer simulator receive times and official split boundaries. The resulting train, validation, and test sets contain 46,811, 17,176, and 45,178 unique BSM observations. Five anomaly models use causal, translation-invariant trajectory features, with robust scaling fit on non-malicious training observations and thresholds selected on validation labels. On the official test split, the LSTM autoencoder and tabular Transformer achieve F1 scores of 0.860 and 0.932, and AUROC values of 0.932 and 0.990. Paired sender-cluster bootstrap intervals quantify uncertainty within this test set. Retrospective top-three attacker-emitter recall is at most 1.58 percent, so message detection does not imply reliable emitter identification. The records are simulated, both attack subsets share one scenario, and 180 sender identifiers overlap between official training and test partitions in each archive. The results do not establish field performance, work-zone false-alarm rates, causal root-cause accuracy, or production latency.
+Public evidence for connected-vehicle misbehavior detection is largely simulated, and evaluations rarely account for sender dependence or unseen attacks. We study what the VeReMi NextGen InTAS highway 2 release supports, using its official splits for data-replay and denial-of-service attacks. After checksum verification, a cross-check of embedded labels against the official ground-truth files, and receiver-copy de-duplication, the train, validation, and test splits contain \ResTrainRecords, \ResValidationRecords, and \ResTestRecords{} basic safety messages. Causal trajectory windows of ten messages with eleven translation-invariant features and validity masks feed four unsupervised or one-class detectors and five supervised detectors, each trained with \ResSeeds{} seeds. Seed variability is reported separately from a paired bootstrap over composite (corridor, sender) clusters, which corrects an identifier collision affecting every test sender. On the official test split, supervised detectors reach mean AUROC between 0.985 and 0.993; random forest (F1 \ResRandomForestFOne) and gradient boosting exceed the Tabular Transformer (F1 \ResTabTransformerFOne) with paired 95\% intervals excluding zero, and the best unsupervised detector reaches AUROC \ResLSTMAEAUROC. Performance holds on a sender-disjoint holdout but not across attack types: in leave-one-attack-type-out tests, supervised detectors fall to or near chance AUROC in seven of ten model and direction pairs. Ablations show that the trajectory window and relative kinematics carry most of the signal, and attacker-emitter recall at three is at most \ResMaxRecallThree\%. The findings are limited to one simulated scenario and do not support field deployment, causal root-cause analysis, or work-zone false-alarm claims.
 \end{abstract}
 
 \begin{IEEEkeywords}
-connected vehicles, misbehavior detection, event streaming, anomaly detection, reproducibility, traffic operations
+connected vehicles, V2X misbehavior detection, VeReMi, anomaly detection, clustered bootstrap, reproducibility
 \end{IEEEkeywords}
 
 \section{Introduction}
-Traffic operations depend on asynchronous observations from roadside detectors, connected vehicles, roadside units, signal controllers, and operator systems. A data-driven monitor must preserve event provenance, validate incomplete records, and identify anomalous telemetry without assuming that independent sources are synchronized. CorridorAIOps-RCA treats the corridor as a distributed event stream. It uses no traffic-physics model, car-following model, control barrier function, generated traffic record, or injected attack record.
+Connected-vehicle deployments broadcast basic safety messages (BSMs) that neighboring vehicles and roadside units consume without independent verification of the sender's physical state. A sender that replays stale messages or floods the channel can therefore degrade cooperative awareness even when its cryptographic credentials are valid. Misbehavior detection addresses this gap by scoring the plausibility of received messages and senders \cite{vanderheijden2019survey}.
 
-The public evidence acquired for this study does not support a field evaluation of causal root-cause localization. We therefore narrow the research question to detection of simulator-labeled vehicular misbehavior in VeReMi NextGen \cite{veremi2026}. Separately acquired sources include Tampa CV Pilot BSM and SPaT samples \cite{tampabsm2019,tampaspat2019}, a PeMS-BAY detector file \cite{pemsbay2022}, Caltrans planned-closure records \cite{caltranslcs}, and CISA and MITRE threat-intelligence feeds \cite{cisakev,mitreics}. Their collection periods, locations, and labels do not support a valid join with VeReMi, so they are excluded from model fitting and evaluation.
+Public evidence for this task is narrow. The acquired VeReMi NextGen InTAS highway 2 release \cite{veremi2026} provides simulated BSM traces with per-message attacker labels and official train, validation, and test paths for two attack categories, \texttt{dataReplay} and \texttt{dosAttack}. It does not provide field incidents, independent corridor scenarios, causal root-cause annotations, or synchronized operational logs. We therefore restrict the claims of this paper to simulated message-level misbehavior detection and retrospective sender ranking. The repository's broader observability tooling, separately acquired traffic and threat-intelligence sources, and graph architectures are not evaluated here.
 
-This study contributes a reproducible provenance and parsing workflow, a causal sequence-feature extractor that retains missingness and exact simulator timestamps, and an official-split benchmark with sender-cluster uncertainty estimates. It also documents what is not measured. In particular, attacker-emitter ranking is not causal component localization, and message-level simulator delay is not field-incident mean time to detect (MTTD).
+Within that scope, an evaluation must still answer three practical questions: whether the reported uncertainty reflects the dependence between messages from the same sender, whether supervised detectors trained on one attack category transfer to another, and which trajectory features carry the signal. This paper contributes:
+\begin{enumerate}
+\item an audited ingestion path that verifies archive checksums and cross-checks embedded labels against the separately published official ground-truth files;
+\item a sender-cluster evaluation protocol that identifies clusters by the composite key (\texttt{corridor\_id}, \texttt{source\_id}), correcting a cross-archive identifier collision that affects every test sender, and that reports training-seed variability separately from bootstrap intervals;
+\item a benchmark that separates unsupervised or one-class detectors from supervised detectors and reports matched false-alarm operating points;
+\item leave-one-attack-type-out (LOAO) and strict sender-disjoint generalization tests, five controlled feature and temporal ablations, and a measured second-run reproduction audit.
+\end{enumerate}
 
 \section{Related Work}
-Traffic prediction research learns temporal or spatial patterns from detector observations, including the PeMS-BAY benchmark \cite{li2018dcrnn}. Prediction performance does not by itself identify a malicious message or an operational root cause. Sequence models such as Transformers provide flexible temporal encoders \cite{vaswani2017attention}, while SHAP provides feature attribution for a model prediction \cite{lundberg2017shap}. Neither attention weights nor feature attributions establish causal responsibility.
+\subsection{V2X Misbehavior Detection}
+Misbehavior detection in cooperative intelligent transportation systems combines node-centric checks, which assess a sender's behavior over time, with data-centric plausibility checks on message content such as position, speed, and beacon frequency \cite{vanderheijden2019survey}. The original VeReMi dataset \cite{vanderheijden2018veremi} made such detectors comparable by releasing labeled simulation traces with position-falsification attacks, and the VeReMi Extension \cite{kamel2020veremiextension} added sensor-error models and a wider attack catalog including replay, denial-of-service, and Sybil behavior. The F2MD framework \cite{kamel2020f2md} supports simulation-based development and evaluation of these detectors. Machine-learning detectors are commonly trained on features derived from plausibility checks \cite{so2018plausibility}. VeReMi NextGen \cite{veremi2026} provides official split paths and ground-truth files for its InTAS scenarios, which we use directly.
 
-Studies that classify prepared crash-severity labels with Transformers or explain them with SHAP address a static outcome-prediction task. Real-time streaming AIOps instead evaluates sequential device and controller observations, alert delay, and component-level responsibility against time-aligned operational ground truth. These tasks require event-level provenance and different validation data. The present work does not claim that a static crash model solves streaming cyber-physical RCA; it evaluates only simulated misbehavior labels and explicitly leaves causal attribution unevaluated.
+Two evaluation issues recur in this literature. First, messages from one sender are strongly dependent, so per-message resampling understates uncertainty. Second, detectors are often trained and tested on the same attack catalog, which does not show whether a detector recognizes an unseen attack. We address the first with a composite sender-cluster bootstrap and the second with LOAO and sender-disjoint tests.
 
-Isolation forest identifies observations isolated by random partitions \cite{liu2008isolation}. One-class support vector machines estimate a boundary around nominal observations \cite{scholkopf2001estimating}. Both offer transparent unsupervised baselines. Their score thresholds and feature representations still require validation. Here, threshold selection uses the official validation labels, and the final test split is reserved for reporting.
+\subsection{Anomaly and Supervised Detectors}
+Isolation forest isolates observations through random partitions \cite{liu2008isolation}, one-class support vector machines estimate the support of nominal data \cite{scholkopf2001estimating}, and LSTM encoder-decoders score reconstruction error on normal sequences \cite{malhotra2016lstm}. These methods require only non-malicious training data. Supervised baselines include logistic regression, random forests \cite{breiman2001random}, histogram gradient boosting in the style of LightGBM \cite{ke2017lightgbm} as implemented in scikit-learn \cite{pedregosa2011scikit}, multilayer perceptrons, and Transformer encoders \cite{vaswani2017attention}, which are competitive but not uniformly superior on tabular data \cite{gorishniy2021revisiting}. Traffic forecasting models such as DCRNN \cite{li2018dcrnn} and feature-attribution methods such as SHAP \cite{lundberg2017shap} address different questions: neither identifies malicious messages, and attributions do not establish causal responsibility.
 
-\section{System Architecture and Real-World Data Pipeline}
-The software separates source acquisition, checksum verification, parsing, typed event validation, replay adapters, scoring, and reporting. Events preserve an identifier, timestamp, corridor, source, kind, measurements, optional label, and the original integer receive time when available. The asynchronous event pipeline applies bounded-queue backpressure. Read-only adapters parse Vissim FZP and LSA exports, SUMO traces, and CARLA or ROS 2 JSON Lines; these adapters do not claim live simulator integration.
+\subsection{Uncertainty in Benchmarks}
+For clustered data, the bootstrap must resample independent clusters rather than dependent rows \cite{efron1993introduction,field2007bootstrapping}. Separately, the variance induced by model initialization and data ordering can be comparable to differences between methods \cite{bouthillier2021accounting}. These two sources answer different questions, so we report them separately.
 
-The acquired VeReMi NextGen archives provide attacker labels and official train, validation, and test paths. A sender/message/time broadcast repeated across receiver files is retained once, using its earliest receive observation. De-duplication is confined to each official split. The two acquired attack categories are \texttt{dataReplay} and \texttt{dosAttack}; both represent InTAS highway 2. Sender identifiers overlap between training and test by 180 per archive, and there is no independent-scenario holdout.
+\section{Data, Provenance, and Label Audit}
+The acquisition step downloads the two InTAS highway 2 archives and the three official per-split ground-truth files from Zenodo and verifies each against the published MD5 checksum and a recorded SHA-256 digest. Receiver files repeat each broadcast; the parser keeps one observation per (\texttt{sender\_id}, \texttt{messageID}, \texttt{sendTime}) within an official split, using the earliest integer receive time in nanoseconds. After de-duplication, the train, validation, and test splits contain \ResTrainRecords, \ResValidationRecords, and \ResTestRecords{} BSM observations, of which \ResTrainAttacker, \ResValidationAttacker, and \ResTestAttacker{} carry the attacker label.
 
-The additional public sources are kept separate. The acquired Tampa BSM and SPaT query samples do not overlap in their observed time ranges. The PeMS-BAY source file contains five-minute station measurements without incident labels or documented station ordering. The Caltrans material describes planned closures and is not matched to observed traffic during those closures. CISA and MITRE records provide threat context, not corridor event labels. Consequently, these sources support ingestion and format checks only. They are not merged into a synthetic corridor dataset.
+\subsection{Official Ground-Truth Cross-Check}
+The official ground-truth files record the genuine sender state of each broadcast. They contain no \texttt{attacker} or attack-type field, so a direct label-to-label comparison is not possible. The audit instead enforces three verifiable invariants and raises an error on any violation: the attack category encoded in each archive name equals the category in every nested member path; every record with \texttt{attacker} $=0$ appears in the same split's ground truth with matching sender position and speed (absolute tolerance $10^{-6}$); and any ground-truth record that does carry an \texttt{attacker} field agrees with the embedded label. All raw records pass. In \texttt{dataReplay}, all 18,496 attacker-labeled raw records diverge from the official ground-truth state, whereas in \texttt{dosAttack} 42,192 attacker-labeled records have no ground-truth broadcast and 20,140 match it. These outcomes are consistent with replayed content and injected flood messages, respectively, and provide label corroboration that does not depend on the embedded labels themselves. The per-archive outcome counts and a SHA-256 digest of the cross-check are stored in \texttt{results/dataset\_capability\_matrix.json}.
+
+\subsection{Composite Sender Clusters}
+Each archive-split pair defines a \texttt{corridor\_id}. Because both archives replay the same InTAS vehicle population, the same \texttt{source\_id} string appears in both archives for \ResTestCollisions{} test senders, that is, for every test sender. A bootstrap over bare \texttt{source\_id} strings would merge two distinct simulated transmitters into one cluster. We therefore define clusters by (\texttt{corridor\_id}, \texttt{source\_id}), giving \ResTrainClusters, \ResValidationClusters, and \ResTestClusters{} clusters in the three official splits. Within each archive, \ResTrainTestOverlap{} sender identifiers occur in both the official training and test splits, so the official split is not a sender-disjoint evaluation.
+
+Separately acquired Tampa CV Pilot BSM and SPaT samples \cite{tampabsm2019,tampaspat2019}, a PeMS-BAY detector file \cite{pemsbay2022}, Caltrans planned closures \cite{caltranslcs}, and CISA and MITRE threat-intelligence feeds \cite{cisakev,mitreics} are not time-aligned with VeReMi or with each other. They are excluded from fitting and scoring. Fig.~\ref{fig:architecture}a summarizes this evidence boundary and the five pipeline stages, from audited acquisition through parsing, causal representation, and the two detector regimes to evaluation; modules that are architecture-only are shown outside the evaluated path.
 
 \begin{figure*}[!t]
 \centering
 \includegraphics[width=0.98\textwidth]{figures/fig1_architecture.pdf}
-\caption{Evidence-bounded pipeline. The benchmark uses only official VeReMi splits; other public sources remain separate because the acquired observations are not aligned.}
+\caption{System and model architecture. (a) Evidence-bounded pipeline: only official VeReMi splits enter fitting and scoring, while other public sources are acquired and audited but excluded because their observations are not aligned; architecture-only modules are not evaluated. (b) Supervised Tabular Transformer: the masked window $[X \odot M, M]$ is projected to $d=32$ with learned position embeddings, passed through one pre-norm encoder layer whose four-head self-attention applies a causal mask and a key-padding mask, pooled at the last valid step, and scored by a sigmoid head whose threshold is set on validation data.}
 \label{fig:architecture}
 \end{figure*}
 
-\section{Track A1 Methodology}
-\subsection{Causal Event Features}
-For each sender within an official split, the feature extractor constructs a length-10 trailing window. It retains separate temporal and per-feature validity masks. The 11 features are observed speed and acceleration, inter-message time, causal inter-message jitter, horizontal displacement, vertical position change, absolute speed change, wrapped heading change, local one-second sender density within 150 m, duplicate-timestamp indicator, and long-gap indicator. Absolute coordinates are not model inputs. No kinematic prediction, car-following equation, or physics residual is used. Each window depends only on the current and preceding observations for that sender; local density uses observations available up to the current event.
+\section{Methods}
+\subsection{Causal Trajectory Features}
+For each sender within an official archive split, a trailing window of length $L=10$ holds 11 per-message features: speed, acceleration, inter-arrival time $\Delta t_i$, causal jitter, horizontal displacement, vertical step, absolute speed change, wrapped heading change, local sender density, a duplicate-timestamp indicator, and a long-gap indicator. Absolute coordinates are not inputs. Causal jitter is
+\begin{equation}
+j_i = \left|\Delta t_i - \frac{1}{i-1}\sum_{k=1}^{i-1}\Delta t_k\right|,
+\end{equation}
+where the running mean covers the sender's positive inter-arrival times since the last history reset; a gap above 5~s resets the history, and $j_i$ is masked until one prior interval exists. Local density counts distinct senders, including the focal sender itself, whose latest position within the trailing 1~s lies within 150~m of the focal position, so its minimum valid value is one. Every feature has a validity mask, and padded window steps have a step mask. Each window uses only the current and earlier messages of the same split.
 
-Receiver copies are removed before feature extraction, and the exact integer \texttt{rcvTime} in nanoseconds is used for ordering and intervals. Python datetime values are retained for general event interchange, but are not used to calculate sub-microsecond intervals. Gaps greater than five seconds reset the sender history. Missing and non-finite fields are represented by validity masks rather than silently treated as observed zeros.
+\subsection{Detectors in Two Supervision Regimes}
+Robust scaling (median and $1.4826\times$MAD) is fit on non-malicious training records only. The \emph{unsupervised or one-class} regime is fit without attacker labels: robust threshold rules count current-step features whose absolute robust score exceeds three; isolation forest and a one-class SVM (seeded sample of at most 10,000 records) use current-step features and masks; and an LSTM autoencoder reconstructs $L=10$ sequences with a masked loss that excludes padded steps and unobserved features. The \emph{supervised} regime uses training labels: logistic regression, a random forest, histogram gradient boosting, and a two-layer MLP receive the flattened $L=10$ window with masks, and a one-layer Tabular Transformer applies causal self-attention with feature and step masks. Fig.~\ref{fig:architecture}b details this model. The masked input $[X \odot M,\ M]$ is projected to a 32-dimensional embedding with learned position embeddings; a single pre-norm encoder layer applies four-head self-attention under a causal mask, so step $i$ attends only to steps $j \le i$, and a key-padding mask that removes padded steps; and the representation of the last valid step feeds a linear sigmoid output whose alert threshold is set on validation data. XGBoost is supported but was not installed and is reported as not run. Neural models use AdamW, at most \ResEpochs{} epochs, and the checkpoint with the best validation AUROC (patience two). The log Transformer, StaticGCN, and AsyncSTGNN modules in the repository are architecture-only and are not evaluated.
 
-\subsection{Baselines and Threshold Selection}
-Isolation forest and one-class SVM are fitted using only non-malicious training observations. To bound quadratic fitting cost, the SVM uses a deterministic sample of at most 10,000 training observations; isolation forest uses all 31,361 non-malicious training observations. The robust-threshold baseline counts normalized observed features whose absolute robust score exceeds three. The LSTM autoencoder reconstructs only non-malicious training sequences and scores masked reconstruction error. The tabular Transformer is supervised on the official training labels and uses causal temporal attention with telemetry validity masks. Feature medians and scales are estimated from non-malicious training observations only. Missing features are normalized to zero, with their masks retained in the input representation.
+\subsection{Thresholds, Operating Points, and Uncertainty}
+For every model and seed, the alert threshold maximizes F1 on the validation split. We report test F1, AUROC, average precision (AP), and the false-alarm rate (FAR) on non-malicious records. Matched false-alarm budgets of 1\% and 5\% are reported in two ways: the test ROC true-positive rate at that FPR, which reads the curve descriptively, and a deployable recall obtained by fixing the threshold so that the validation non-malicious alert rate is within budget, together with the realized test FAR.
 
-For each model, the alert threshold is selected to maximize F1 on the official validation split. Neural model checkpoints are selected by validation AUROC, with early stopping after two epochs without improvement. The official test split is not used for preprocessing, model fitting, checkpoint selection, or threshold selection. These models evaluate event-level misbehavior detection. For retrospective emitter ranking, each sender is assigned its maximum test-message anomaly score, then ranked against the published attacker labels. This top-\(k\) recall does not identify a causal component.
+Each stochastic model is trained with \ResSeeds{} seeds, and tables report the mean $\pm$ sample standard deviation across seeds. Separately, a paired nonparametric bootstrap draws \ResBootRequested{} resamples of composite test clusters with replacement using the first seed's scores; every model is scored on the same resample, and percentile 95\% intervals are reported for each metric and for paired differences $\Delta = \text{Transformer} - \text{model}$. A replicate lacking either class would be skipped and counted.
 
-\subsection{Metrics and Uncertainty}
-We report cyber-versus-non-malicious F1, AUROC, average precision, and false-alarm rate on non-malicious VeReMi test messages. We also report sender-level attacker-emitter recall at \(k=1\) and \(k=3\). A simulator-time message detection delay is calculated only for observed test-split transitions from attacker label 0 to 1. Test-entry positive sequences are left-censored, and undetected onsets are excluded from the mean delay but counted in detection coverage. This quantity is not field MTTD.
+\subsection{Generalization and Ablation Protocols}
+LOAO trains and selects thresholds on one archive's official train and validation splits and tests on the other archive's official test split, in both directions. Normalization is fit on the source archive only. A direction is marked \texttt{NOT\_EVALUABLE} if any partition lacks both classes or the feature schemas differ. The sender-disjoint holdout partitions all bare \texttt{source\_id} values across both archives and all official splits 60/20/20 by a salted SHA-256 order within attacker and non-attacker strata, which guarantees zero composite overlap; it pools the official time splits, so it tests unseen senders rather than future time.
 
-Uncertainty intervals use 1,000 paired nonparametric bootstrap resamples of test sender identifiers. The same sender resample is used for each model. The 20 rows in \texttt{seed\_metrics.csv} are the first 20 cluster-bootstrap draws; they are not independent days, corridors, or repeated model-training runs. This interval describes within-test sender-cluster resampling and does not resolve the shared-scenario or sender-overlap limitations.
+Five ablations each change one factor relative to the full configuration, for the Tabular Transformer and the supervised baseline with the highest mean validation AUROC (chosen without test data): (i) $L=1$ instead of $L=10$; (ii) absolute $x$, $y$, $z$ and heading instead of the four translation-invariant kinematic features; (iii) removal of inter-arrival, jitter, duplicate-timestamp, and long-gap features; (iv) removal of local density; and (v) removal of validity and step masks, with missing values imputed at the normalized benign median.
 
-\section{Experimental Setup and Results}
-After receiver-copy de-duplication, the official train, validation, and test sets contain 46,811, 17,176, and 45,178 BSM observations. The corresponding non-malicious and attacker-labeled counts are 31,361 and 15,450 for training, 11,291 and 5,885 for validation, and 30,905 and 14,273 for test. All labels retain the dataset's simulator misbehavior meaning; they are not labels of field cyber incidents.
+\section{Results}
+\subsection{Official-Split Comparison}
+Table~\ref{tab:main} separates the two supervision regimes. All five supervised detectors exceed every unsupervised or one-class detector on F1, AUROC, and AP. Random forest (F1 \ResRandomForestFOne, AUROC \ResRandomForestAUROC) and histogram gradient boosting (F1 \ResHGBFOne, AUROC \ResHGBAUROC) are the strongest models; the Tabular Transformer reaches F1 \ResTabTransformerFOne{} and AUROC \ResTabTransformerAUROC. Among detectors that use no attacker labels, the LSTM autoencoder has the highest AUROC (\ResLSTMAEAUROC) and the one-class SVM the highest AP (\ResOneClassSVMAP) and lowest FAR (\ResOneClassSVMFAR\%). Logistic regression and histogram gradient boosting have zero seed variance because their fitting procedures, as configured, do not depend on the random seed; the reported standard deviations for the other models reflect initialization, subsampling, and data-order effects.
 
-Table~\ref{tab:benchmark} reports the measured results. The tabular Transformer gives the highest test F1 and AUROC, at 0.932 and 0.990, with a 3.59 percent false-alarm rate. The LSTM autoencoder reaches F1 0.860 and AUROC 0.932, with a 9.39 percent false-alarm rate. One-class SVM has the lowest false-alarm rate at 2.67 percent, while isolation forest and robust rules have rates of 26.26 and 29.74 percent. Across models, retrospective attacker-emitter recall at \(k=3\) ranges from zero to 1.58 percent. This large gap between event detection and sender ranking cautions against treating the detection result as localization performance.
-
-\begin{table}[!t]
+\begin{table*}[!t]
 \centering
-\caption{Official test-split results. FAR is computed on non-malicious VeReMi records and is not a work-zone FAR.}
-\label{tab:benchmark}
-{\scriptsize\input{../results/results_table.tex}}
-\end{table}
+\caption{Official VeReMi test split: mean $\pm$ sample standard deviation over \ResSeeds{} training seeds. Thresholds maximize validation F1. FAR is the alert rate on non-malicious records, not a work-zone FAR.}
+\label{tab:main}
+{\footnotesize\input{../results/results_table.tex}}
+\end{table*}
 
-Paired sender-cluster bootstrap 95 percent intervals are reported for F1, AUROC, and non-malicious false-alarm rate in the machine-readable benchmark output. For the tabular Transformer, the intervals are 0.914 to 0.946 for F1, 0.987 to 0.993 for AUROC, and 0.029 to 0.044 for false-alarm rate. These intervals are conditional on the acquired test senders and do not imply scenario-level generalization.
+Matched false-alarm operating points (Table~\ref{tab:operating}) widen the gap between regimes. At a 1\% FPR on the test ROC, the supervised detectors recover \ResLogRegTPRatOne{} to \ResHGBTPRatOne{} of attacker messages, whereas the LSTM autoencoder recovers \ResLSTMAETPRatOne{} even though its AUROC exceeds 0.92: its errors concentrate among the highest-scoring benign records. The one-class SVM is the only unsupervised detector with useful low-FAR recall (\ResOneClassSVMTPRatOne). Fig.~\ref{fig:curves} shows this contrast on a logarithmic false-positive axis for the first training seed: the one-class SVM already detects about half of the attacker messages near a false-positive rate of $10^{-3}$, whereas the LSTM autoencoder's true-positive rate stays near zero until roughly 3\% FPR. The supervised curves lie close together, and their precision stays near one until a recall of about 0.9. When thresholds are instead fixed on validation non-malicious records, the realized test FAR exceeds the 1\% and 5\% budgets for most models (right half of Table~\ref{tab:operating}); for example, the Tabular Transformer calibrated to a 1\% budget alerts on 3.13\% of non-malicious test records while recovering 0.934 of attacker messages. Budgets set on validation data therefore do not transfer exactly to the test period.
+
+\begin{table*}[!t]
+\centering
+\caption{Matched false-alarm operating points. Test ROC TPR reads the test curve at the stated FPR. Validation-calibrated recall fixes the threshold on validation non-malicious records and reports test recall with the realized test FAR in parentheses (means over seeds).}
+\label{tab:operating}
+{\footnotesize\input{../results/results_operating_points.tex}}
+\end{table*}
+
+Table~\ref{tab:bootstrap} gives composite sender-cluster bootstrap intervals and paired differences. All \ResBootValid{} of \ResBootRequested{} replicates over \ResBootClusters{} clusters contained both classes, so \ResBootSkipped{} were skipped. The Tabular Transformer is better than every unsupervised detector and than logistic regression and the MLP, but the paired intervals against random forest ($\Delta$F1 \ResRandomForestDeltaFOneCI, $\Delta$AUROC \ResRandomForestDeltaAUROCCI) and histogram gradient boosting ($\Delta$F1 \ResHGBDeltaFOneCI) lie entirely below zero. Fig.~\ref{fig:ablation}c and~\ref{fig:ablation}d plot these paired intervals: every unsupervised detector lies well to the right of zero, and only random forest and gradient boosting lie to its left. These intervals describe sender resampling for one training seed and are not combined with the seed variance in Table~\ref{tab:main}.
+
+\begin{table*}[!t]
+\centering
+\caption{Composite (\texttt{corridor\_id}, \texttt{source\_id}) cluster bootstrap: percentile 95\% intervals and paired differences $\Delta$ = Tabular Transformer minus model, from \ResBootValid{} valid of \ResBootRequested{} resamples of \ResBootClusters{} test clusters (first training seed).}
+\label{tab:bootstrap}
+{\footnotesize\input{../results/results_bootstrap.tex}}
+\end{table*}
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=0.98\textwidth]{figures/fig2_detection_roc_pr.pdf}
-\caption{ROC and precision-recall curves for the five evaluated models on the official VeReMi test split.}
+\includegraphics[width=0.92\textwidth]{figures/fig2_detection_roc_pr.pdf}
+\caption{ROC curves with logarithmic false-positive axis and precision-recall curves on the official test split, separated by supervision regime. Shaded bands mark the 1\% and 5\% false-alarm budgets; legends give AUROC and AP as mean $\pm$ standard deviation over training seeds.}
 \label{fig:curves}
 \end{figure*}
 
-Among 55 observed test-split attacker-label onsets, isolation forest detects 55, one-class SVM detects 44, robust rules detect 52, the LSTM autoencoder detects 46, and the tabular Transformer detects 49 at their validation-selected thresholds. Their mean detected onset delays are 0.073, 0.500, 0.269, 0.630, and 0.388 simulator seconds, respectively. The test timelines are sparse event observations, left-censored at split entry, and simulator-only. These delays are not field MTTD or end-to-end streaming measurements. Local vectorized inference time is recorded in the results table, but it excludes parsing, graph construction, transport, and deployment workload.
+\subsection{Attack-Type and Sender Generalization}
+Table~\ref{tab:generalization} and Fig.~\ref{fig:context} report per-attack slices, LOAO, and the sender-disjoint holdout. Table~\ref{tab:generalization} lists four representative detectors with F1 and low-FAR recall, and Fig.~\ref{fig:context}a gives AUROC for all nine. Within the pooled models, \texttt{dosAttack} is nearly separable (Tabular Transformer AUROC \ResDoSOnlyTabTransformerAUROC), while \texttt{dataReplay} is harder (\ResReplayOnlyTabTransformerAUROC) and the robust rules, isolation forest, and one-class SVM are near chance on it (Fig.~\ref{fig:context}a).
 
-\begin{figure}[!t]
+In Fig.~\ref{fig:context}a, blue cells mark AUROC above chance and orange cells mark AUROC below 0.5, where attacker messages are ranked below non-malicious ones; every orange cell lies in the two LOAO columns. LOAO tests show that this performance does not transfer across attack types. Trained on \texttt{dataReplay} and tested on \texttt{dosAttack}, logistic regression and histogram gradient boosting rank attacker messages below non-malicious ones (AUROC \ResLOAOReplayToDoSLogRegAUROC{} and \ResLOAOReplayToDoSHGBAUROC), the Tabular Transformer varies strongly across seeds (\ResLOAOReplayToDoSTabTransformerAUROC), and random forest keeps AUROC \ResLOAOReplayToDoSRandomForestAUROC{} but, at its source-calibrated threshold, F1 of only \ResLOAOReplayToDoSRandomForestFOne. Only the MLP (\ResLOAOReplayToDoSMLPAUROC) and the unsupervised detectors, which never saw attacker labels, keep high AUROC in this direction. In the reverse direction, no supervised detector exceeds AUROC 0.56 (for example, Tabular Transformer \ResLOAODoSToReplayTabTransformerAUROC, MLP \ResLOAODoSToReplayMLPAUROC); the LSTM autoencoder retains the highest AUROC (\ResLOAODoSToReplayLSTMAEAUROC), but its source-calibrated threshold yields F1 of only \ResLOAODoSToReplayLSTMAEFOne. Both directions had both classes in every partition and identical feature schemas, so neither was marked \texttt{NOT\_EVALUABLE}.
+
+The sender-disjoint holdout has \ResSenderTrainSenders, \ResSenderValidationSenders, and \ResSenderTestSenders{} senders in its partitions and \ResSenderOverlap{} composite overlap between training and test. Supervised AUROC remains high (Tabular Transformer \ResSenderTabTransformerAUROC, histogram gradient boosting \ResSenderHGBAUROC). Within this scenario, therefore, unseen senders are not the main failure mode; unseen attack types are.
+
+\begin{table*}[!t]
 \centering
-\includegraphics[width=\columnwidth]{figures/fig3_false_alarm_uncertainty.pdf}
-\caption{False-alarm rate on non-malicious VeReMi records and cyber/misbehavior F1 across sender-cluster bootstrap resamples. Work-zone FAR is not measured.}
-\label{fig:uncertainty}
-\end{figure}
-
-Fig.~\ref{fig:features} shows descriptive median feature separation between test label groups. It is not SHAP, a model explanation, or causal evidence. In particular, temporal feature separation can reflect the construction of the simulated scenarios and should not be interpreted as a field anomaly signature.
+\caption{Generalization: per-attack slices of the pooled official models, leave-one-attack-type-out (LOAO) transfer, and the sender-disjoint holdout (mean $\pm$ standard deviation over \ResSeeds{} training seeds). Shown are the unsupervised detector and the two supervised baselines with the highest mean validation AUROC, plus the Tabular Transformer. AUROC for all nine detectors appears in Fig.~\ref{fig:context}a, and every metric for every detector is in \texttt{results/benchmark\_summary.json} and \texttt{results/seed\_metrics.csv}.}
+\label{tab:generalization}
+{\scriptsize\input{../results/results_generalization.tex}}
+\end{table*}
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=0.9\textwidth]{figures/fig4_feature_separation.pdf}
-\caption{Descriptive median feature separation between attacker-labeled and non-malicious test observations. The plot is neither SHAP attribution nor causal localization.}
-\label{fig:features}
+\includegraphics[width=0.93\textwidth]{figures/fig3_localization_and_context.pdf}
+\caption{(a) Test AUROC across evaluation contexts on a scale centered at chance; values below 0.5 indicate inverted ranking. (b) Retrospective attacker-emitter recall at $k=1$ and $k=3$ (mean $\pm$ standard deviation over seeds).}
+\label{fig:context}
 \end{figure*}
 
-\section{Discussion and Deployment Implications}
-The benchmark establishes that the acquisition, deduplication, causal-window extraction, and official-split evaluation pipeline can be reproduced on the acquired VeReMi records. The tabular Transformer separates the two simulator label groups better than the other evaluated models, but the result is conditional on a single simulated highway scenario. It does not show generalization to real traffic, other attacks, or field RSUs. Sender overlap between train and test also means that the official split is not an unseen-sender-only evaluation.
+\subsection{Sender Ranking and Simulated Latency}
+Ranking test senders by their maximum message score recovers few attacker-labeled senders: recall at $k=3$ is at most \ResMaxRecallThree\% for any model (Fig.~\ref{fig:context}b). High message-level AUROC therefore does not translate into reliable emitter identification, and this ranking is not causal component localization. Simulated detection delays for test-split attacker-label onsets are stored in the benchmark output; they are left-censored, simulator-time quantities and not field MTTD.
 
-The current data do not support work-zone false-alarm evaluation, cross-modal fusion, causal root-cause accuracy, or field incident response time. The LSTM autoencoder and tabular Transformer are trained sequence baselines. StaticGCN and AsyncSTGNN remain architecture-only, and the log Transformer is not eligible for this benchmark because synchronized controller text is unavailable. No SHAP result, Granger analysis, or causal graph claim is made. The project keeps these statuses explicit in its model-eligibility matrix.
+\subsection{Feature and Temporal Ablations}
+Histogram gradient boosting had the highest mean validation AUROC among the supervised baselines and is ablated alongside the Tabular Transformer (Table~\ref{tab:ablation}, Fig.~\ref{fig:ablation}). Mean AUROC changes are reported as variant minus full configuration. Reducing the window to the current message changes AUROC by \ResAblWindowTTDelta{} for the Transformer and \ResAblWindowTopDelta{} for gradient boosting, and replacing translation-invariant kinematics with absolute coordinates changes it by \ResAblCoordsTTDelta{} and \ResAblCoordsTopDelta; both variants also lose more than 0.1 of TPR at a 1\% false-alarm budget. Removing timing and jitter features affects the Transformer (\ResAblTimingTTDelta) but not gradient boosting (\ResAblTimingTopDelta). Removing local density (\ResAblDensityTTDelta, \ResAblDensityTopDelta) or validity masks (\ResAblMasksTTDelta, \ResAblMasksTopDelta) has small effects. The causal trajectory window and relative kinematics carry most of the signal in this scenario.
 
-A field-oriented follow-up requires synchronized and rights-cleared BSM, SPaT, detector, RSU, and controller logs from multiple corridors and dates, along with incident onset and component-level causal labels. Evaluation should include temporal and corridor holdouts, operational benign-noise labels, calibrated thresholds, and end-to-end latency under a stated workload. Until those records exist, the current result is a simulator misbehavior benchmark, not a deployment-ready RCA system.
+\begin{table*}[!t]
+\centering
+\caption{Feature and temporal ablations on the official split for the Tabular Transformer and the top supervised baseline (mean $\pm$ standard deviation over seeds). $\Delta$ columns give the change in mean AUROC and in test ROC TPR at a 1\% false-alarm budget relative to the full configuration.}
+\label{tab:ablation}
+{\footnotesize\input{../results/results_ablation.tex}}
+\end{table*}
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/fig4_ablation_and_robustness.pdf}
+\caption{(a, b) Ablation effects on AUROC and on TPR at a 1\% false-alarm budget, as mean $\pm$ standard deviation of per-seed paired differences. (c, d) Composite sender-cluster bootstrap 95\% intervals for paired AUROC and F1 differences relative to the Tabular Transformer.}
+\label{fig:ablation}
+\end{figure*}
+
+\subsection{Reproduction Audit}
+\ResReproSentence
+
+\section{Discussion and Limitations}
+Three findings qualify the high official-split scores. First, model choice matters less than supervision: with labels, simple tree ensembles match or exceed the Tabular Transformer, so the Transformer's added complexity is not supported by this evidence. Second, the supervised detectors learn attack-specific signatures. The LOAO collapse, including AUROC values well below 0.5, means a detector trained on one simulated attack may actively mis-rank another. A deployment would need either label coverage of the expected attack catalog or unsupervised components whose thresholds are calibrated per context. Third, low-FAR behavior differs sharply from AUROC, so operating-point reporting is necessary for any alerting use.
+
+The limitations are substantial. Both archives are simulations of one highway scenario, so there is no independent-scenario holdout. The official ground-truth files cannot verify attacker labels directly; the cross-check verifies benign records and archive attack types only. The sender-disjoint holdout pools official time splits. Bootstrap intervals are conditional on the acquired test senders and one training seed. XGBoost was not installed and not run, and the log Transformer and graph models are architecture-only. No field data, causal root-cause labels, work-zone exposure, synchronized controller logs, or end-to-end latency measurements were available, so none of those properties is claimed.
 
 \section{Conclusion}
-This paper evaluates five data-driven models on deduplicated official VeReMi NextGen splits using trajectory features without physics-based prediction equations. The tabular Transformer reaches F1 0.932 and AUROC 0.990, while its retrospective sender-level top-three attacker recall is only 1.58 percent. Cluster-bootstrap intervals quantify within-test uncertainty, but both attack categories come from the same scenario and training/test sender overlap remains. The evidence supports simulated message-level misbehavior analysis only. It does not support field cyber-detection, work-zone FAR, causal root-cause localization, or production performance claims.
+On official VeReMi NextGen InTAS highway 2 splits, causal trajectory features support accurate simulated misbehavior detection when attack labels are available, with tree ensembles performing best. Composite sender-cluster evaluation, separate seed variance, and matched false-alarm operating points make these comparisons interpretable, and the same protocol shows that supervised detectors fail to transfer across attack types even though they generalize to unseen senders. The evidence supports simulated message-level detection only, not field deployment, causal root-cause analysis, or work-zone false-alarm claims.
 
+\FloatBarrier
 \bibliographystyle{IEEEtran}
 \bibliography{references}
 \end{document}

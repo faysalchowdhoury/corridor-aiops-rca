@@ -17,4 +17,4 @@ jobs:
       - run: ruff check .
       - run: pytest
       - run: corridor-ingest --tampa-limit 10
-      - run: corridor-benchmark --seeds 2 --bootstrap-samples 50 --epochs 1
+      - run: corridor-benchmark --train-seeds 1 --bootstrap-samples 50 --bootstrap-preview-rows 2 --epochs 1 --skip-ablations

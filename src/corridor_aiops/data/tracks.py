@@ -17,74 +17,80 @@ from corridor_aiops.data.trajectory import (
 from corridor_aiops.schema import CorridorEvent, EventKind
 
 _NANOSECONDS_PER_SECOND = 1_000_000_000
+_EVENT_SCORING = "aggregate_event_anomaly_scores_by_sender"
+
+
+def _definition(
+    name: str,
+    regime: str,
+    status: str,
+    model_input: str,
+    *,
+    available: bool = True,
+    scoring: str = _EVENT_SCORING,
+) -> dict[str, Any]:
+    return {
+        "name": name,
+        "supervision_regime": regime,
+        "implementation_status": status,
+        "input": model_input,
+        "inputs_available_in_veremi": available,
+        "emitter_scoring": scoring,
+    }
+
+
+_UNSUP = "unsupervised_or_one_class"
+_SUP = "supervised"
 _MODEL_DEFINITIONS = (
-    {
-        "name": "isolation_forest",
-        "implementation_status": "implemented_baseline",
-        "input": "causal_trajectory_features",
-        "inputs_available_in_veremi": True,
-        "emitter_scoring": "aggregate_event_anomaly_scores_by_sender",
-    },
-    {
-        "name": "one_class_svm",
-        "implementation_status": "implemented_baseline",
-        "input": "causal_trajectory_features",
-        "inputs_available_in_veremi": True,
-        "emitter_scoring": "aggregate_event_anomaly_scores_by_sender",
-    },
-    {
-        "name": "robust_threshold_rules",
-        "implementation_status": "implemented_baseline",
-        "input": "causal_trajectory_features",
-        "inputs_available_in_veremi": True,
-        "emitter_scoring": "aggregate_event_anomaly_scores_by_sender",
-    },
-    {
-        "name": "lstm_autoencoder",
-        "implementation_status": "architecture_only",
-        "input": "causal_trajectory_sequences",
-        "inputs_available_in_veremi": True,
-        "emitter_scoring": "aggregate_event_anomaly_scores_by_sender",
-    },
-    {
-        "name": "tabular_transformer",
-        "implementation_status": "architecture_only",
-        "input": "causal_trajectory_sequences",
-        "inputs_available_in_veremi": True,
-        "emitter_scoring": "aggregate_event_anomaly_scores_by_sender",
-    },
-    {
-        "name": "corridor_log_transformer",
-        "implementation_status": "architecture_only",
-        "input": "trajectory_sequences_and_controller_text_logs",
-        "inputs_available_in_veremi": False,
-        "emitter_scoring": "aggregate_event_anomaly_scores_by_sender",
-    },
-    {
-        "name": "static_gcn",
-        "implementation_status": "architecture_only",
-        "input": "trajectory_features_and_dynamic_v2x_graph",
-        "inputs_available_in_veremi": True,
-        "emitter_scoring": "node_localization_head",
-    },
-    {
-        "name": "async_st_gnn",
-        "implementation_status": "architecture_only",
-        "input": "causal_trajectory_sequences_and_dynamic_v2x_graph",
-        "inputs_available_in_veremi": True,
-        "emitter_scoring": "node_localization_head",
-    },
+    _definition("robust_threshold_rules", _UNSUP, "implemented_baseline", "current_step_features"),
+    _definition("isolation_forest", _UNSUP, "implemented_baseline", "current_step_features"),
+    _definition("one_class_svm", _UNSUP, "implemented_baseline", "current_step_features"),
+    _definition("lstm_autoencoder", _UNSUP, "implemented_baseline", "causal_sequences"),
+    _definition("logistic_regression", _SUP, "implemented_baseline", "flattened_causal_window"),
+    _definition("random_forest", _SUP, "implemented_baseline", "flattened_causal_window"),
+    _definition("hist_gradient_boosting", _SUP, "implemented_baseline", "flattened_causal_window"),
+    _definition("xgboost", _SUP, "optional_baseline", "flattened_causal_window"),
+    _definition("supervised_mlp", _SUP, "implemented_baseline", "flattened_causal_window"),
+    _definition("tabular_transformer", _SUP, "implemented_baseline", "causal_sequences"),
+    _definition(
+        "corridor_log_transformer",
+        _SUP,
+        "architecture_only",
+        "trajectory_sequences_and_controller_text_logs",
+        available=False,
+    ),
+    _definition(
+        "static_gcn",
+        _SUP,
+        "architecture_only",
+        "trajectory_features_and_dynamic_v2x_graph",
+        scoring="node_localization_head",
+    ),
+    _definition(
+        "async_st_gnn",
+        _SUP,
+        "architecture_only",
+        "causal_trajectory_sequences_and_dynamic_v2x_graph",
+        scoring="node_localization_head",
+    ),
 )
 
 
 @dataclass(frozen=True)
 class V2XGraphSlice:
+    """Time-local V2X neighborhood graph built from telemetry only.
+
+    ``member_event_ids`` lists, per node, every event of that sender inside the slice,
+    so labels can be attached afterwards with :func:`attach_attacker_labels` without
+    the graph construction itself ever reading a label.
+    """
+
     corridor_id: str
     slice_start_ns: int
     source_ids: tuple[str, ...]
     windows: tuple[TrajectoryWindow, ...]
-    attacker_labels: tuple[bool, ...]
     adjacency: tuple[tuple[bool, ...], ...]
+    member_event_ids: tuple[tuple[str, ...], ...]
 
 
 def build_v2x_graph_slices(
@@ -93,7 +99,11 @@ def build_v2x_graph_slices(
     radius_meters: float = 300.0,
     time_slice_seconds: float = 1.0,
 ) -> list[V2XGraphSlice]:
-    """Create time-local communication-neighborhood graphs from labeled BSM records."""
+    """Create time-local communication-neighborhood graphs from BSM telemetry alone.
+
+    No ground-truth field is read, so the same function serves unlabeled inference
+    streams. Each node is represented by the sender's latest event in the slice.
+    """
     if not math.isfinite(radius_meters) or radius_meters <= 0:
         raise ValueError("radius_meters must be finite and positive")
     if not math.isfinite(time_slice_seconds) or time_slice_seconds <= 0:
@@ -105,42 +115,28 @@ def build_v2x_graph_slices(
         raise ValueError("V2X graph construction accepts BSM events only")
 
     windows = extract_trajectory_windows(events)
-    grouped: dict[tuple[str, int], dict[str, tuple[CorridorEvent, TrajectoryWindow, bool]]] = (
+    latest: dict[tuple[str, int], dict[str, tuple[CorridorEvent, TrajectoryWindow]]] = (
         defaultdict(dict)
     )
+    members: dict[tuple[str, int], dict[str, list[str]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
     for event, window in zip(events, windows, strict=True):
-        if event.label not in {"benign", "cyber"}:
-            raise ValueError(f"BSM event {event.event_id!r} has no supported VeReMi label")
-        timestamp_ns = _event_time_ns(event)
-        group_key = (event.corridor_id, timestamp_ns // slice_width_ns)
-        sender = grouped[group_key].get(event.source_id)
-        attacker = event.label == "cyber"
-        if sender is None:
-            grouped[group_key][event.source_id] = (event, window, attacker)
-            continue
-        previous_event, _, previous_attacker = sender
-        if (_event_time_ns(event), event.event_id) > (
-            _event_time_ns(previous_event),
-            previous_event.event_id,
+        group_key = (event.corridor_id, _event_time_ns(event) // slice_width_ns)
+        members[group_key][event.source_id].append(event.event_id)
+        current = latest[group_key].get(event.source_id)
+        if current is None or (_event_time_ns(event), event.event_id) > (
+            _event_time_ns(current[0]),
+            current[0].event_id,
         ):
-            grouped[group_key][event.source_id] = (
-                event,
-                window,
-                attacker or previous_attacker,
-            )
-        elif attacker and not previous_attacker:
-            grouped[group_key][event.source_id] = (
-                previous_event,
-                sender[1],
-                True,
-            )
+            latest[group_key][event.source_id] = (event, window)
 
     graph_slices = []
-    for (corridor_id, time_bin), senders in sorted(grouped.items()):
+    for (corridor_id, time_bin), senders in sorted(latest.items()):
         source_ids = tuple(sorted(senders))
         nodes = [senders[source_id] for source_id in source_ids]
         adjacency = [[False] * len(nodes) for _ in nodes]
-        positions = [_position_xy(event) for event, _, _ in nodes]
+        positions = [_position_xy(event) for event, _ in nodes]
         for left, left_position in enumerate(positions):
             if left_position is None:
                 continue
@@ -155,17 +151,45 @@ def build_v2x_graph_slices(
                 if distance <= radius_meters:
                     adjacency[left][right] = True
                     adjacency[right][left] = True
+        group_members = members[(corridor_id, time_bin)]
         graph_slices.append(
             V2XGraphSlice(
                 corridor_id=corridor_id,
                 slice_start_ns=time_bin * slice_width_ns,
                 source_ids=source_ids,
-                windows=tuple(window for _, window, _ in nodes),
-                attacker_labels=tuple(label for _, _, label in nodes),
+                windows=tuple(window for _, window in nodes),
                 adjacency=tuple(tuple(row) for row in adjacency),
+                member_event_ids=tuple(
+                    tuple(sorted(group_members[source_id])) for source_id in source_ids
+                ),
             )
         )
     return graph_slices
+
+
+def attach_attacker_labels(
+    graph_slices: list[V2XGraphSlice],
+    events: list[CorridorEvent],
+) -> list[tuple[bool, ...]]:
+    """Attach supervised node labels after label-free graph construction.
+
+    A node is attacker-labeled when any of its member events in the slice carries the
+    published VeReMi ``cyber`` label. Raises if a member event is unlabeled.
+    """
+    labels_by_event = {event.event_id: event.label for event in events}
+    attached = []
+    for graph_slice in graph_slices:
+        node_labels = []
+        for event_ids in graph_slice.member_event_ids:
+            labels = [labels_by_event.get(event_id) for event_id in event_ids]
+            if any(label not in {"benign", "cyber"} for label in labels):
+                raise ValueError(
+                    f"Slice {graph_slice.corridor_id}@{graph_slice.slice_start_ns} has "
+                    "a member event without a supported VeReMi label"
+                )
+            node_labels.append(any(label == "cyber" for label in labels))
+        attached.append(tuple(node_labels))
+    return attached
 
 
 def _track_status(capability: dict[str, Any], dataset: str, metric: str) -> str:
@@ -264,38 +288,28 @@ def write_model_eligibility_matrix(
         if not isinstance(benchmark, dict) or not isinstance(benchmark.get("models"), dict):
             raise ValueError("Benchmark summary must contain a models object")
         benchmark_models = benchmark["models"]
-        training = benchmark.get("training", {})
-        if not isinstance(training, dict):
-            raise ValueError("Benchmark training metadata must be an object")
-        training_statuses = training.get("sequence_models", {})
-        if not isinstance(training_statuses, dict):
-            raise ValueError("Benchmark sequence_models metadata must be an object")
+        not_run = benchmark.get("models_not_run", {})
         matrix["benchmark_summary_sha256"] = hashlib.sha256(
             benchmark_path.read_bytes()
         ).hexdigest()
         for model in matrix["models"]:
             name = model["name"]
             if name in benchmark_models:
+                record = benchmark_models[name]
+                if not isinstance(record, dict):
+                    raise ValueError(f"Invalid benchmark record for {name}")
+                per_seed = record.get("per_seed") or [{}]
                 model["evaluation_status"] = "evaluated_on_official_veremi_splits"
                 model["evaluation_reference"] = "results/benchmark_summary.json"
-                status_record = training_statuses.get(name)
-                if isinstance(status_record, dict):
-                    model["implementation_status"] = "trained_sequence_baseline"
-                    training_status = status_record.get("training_status")
-                elif isinstance(status_record, str):
-                    model["implementation_status"] = "trained_sequence_baseline"
-                    training_status = status_record
-                elif status_record is None:
-                    training_status = None
-                else:
-                    raise ValueError(f"Invalid sequence model training status for {name}")
-                model["training_status"] = (
-                    "fixed_rule_scored"
-                    if name == "robust_threshold_rules"
-                    else "fit_on_official_benign_training_split"
-                )
-                if training_status is not None:
-                    model["training_status"] = training_status
+                model["training_status"] = per_seed[0].get("training_status", "unknown")
+                model["training_seeds"] = len(per_seed)
+            elif name in not_run:
+                model["evaluation_status"] = "not_run"
+                model["not_run_reason"] = not_run[name]
+            if model["implementation_status"] == "architecture_only" and (
+                model["evaluation_status"] != "not_evaluated_under_track_a1_protocol"
+            ):
+                raise ValueError(f"Architecture-only model {name} cannot be marked evaluated")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         json.dumps(matrix, indent=2, allow_nan=False) + "\n",

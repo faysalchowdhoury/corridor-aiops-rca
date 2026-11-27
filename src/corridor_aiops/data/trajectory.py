@@ -22,6 +22,36 @@ FEATURE_NAMES = (
     "duplicate_timestamp",
     "implausible_gap",
 )
+RAW_COORDINATE_FEATURE_NAMES = (
+    "position_x_m",
+    "position_y_m",
+    "position_z_m",
+    "heading_deg",
+)
+TRANSLATION_INVARIANT_KINEMATIC_FEATURES = (
+    "displacement_xy_m",
+    "vertical_step_m",
+    "speed_change_mps",
+    "heading_change_rad",
+)
+TIMING_FEATURES = (
+    "delta_t_s",
+    "causal_jitter_s",
+    "duplicate_timestamp",
+    "implausible_gap",
+)
+CAUSAL_JITTER_DEFINITION = (
+    "causal_jitter_s[i] = |dt[i] - mean(dt[j] for j in 1..i-1)|, where dt[j] is the "
+    "positive inter-arrival time (receive_time_ns difference / 1e9) of the same sender "
+    "within the current official split; the running mean is cumulative since the last "
+    "history reset (a gap > max_gap_seconds) and the feature is masked until one prior "
+    "interval exists"
+)
+LOCAL_DENSITY_DEFINITION = (
+    "number of distinct senders, including the focal sender itself, whose latest "
+    "position observed within the trailing local_window_seconds lies within "
+    "local_radius_meters of the focal position (so the minimum valid value is 1)"
+)
 
 DEFAULT_WINDOW_SIZE = 10
 DEFAULT_MAX_GAP_SECONDS = 5.0
@@ -147,10 +177,11 @@ def _pad_window(
     history: deque[tuple[tuple[float, ...], tuple[bool, ...]]],
     window_size: int,
     event: CorridorEvent,
+    feature_count: int = len(FEATURE_NAMES),
 ) -> TrajectoryWindow:
     missing = window_size - len(history)
-    empty_values = (0.0,) * len(FEATURE_NAMES)
-    empty_mask = (False,) * len(FEATURE_NAMES)
+    empty_values = (0.0,) * feature_count
+    empty_mask = (False,) * feature_count
     rows = [(empty_values, empty_mask)] * missing + list(history)
     return TrajectoryWindow(
         event=event,
@@ -167,7 +198,14 @@ def extract_trajectory_windows(
     max_gap_seconds: float = DEFAULT_MAX_GAP_SECONDS,
     local_radius_meters: float = DEFAULT_LOCAL_RADIUS_METERS,
     local_window_seconds: float = DEFAULT_LOCAL_WINDOW_SECONDS,
+    include_raw_coordinates: bool = False,
 ) -> list[TrajectoryWindow]:
+    """Build one causal trailing window per event.
+
+    With ``include_raw_coordinates`` the per-step vector is ``FEATURE_NAMES`` followed
+    by ``RAW_COORDINATE_FEATURE_NAMES`` (absolute position and heading); this exists
+    only for the raw-versus-translation-invariant ablation.
+    """
     if window_size < 1:
         raise ValueError("window_size must be positive")
     if not math.isfinite(max_gap_seconds) or max_gap_seconds <= 0:
@@ -186,6 +224,7 @@ def extract_trajectory_windows(
         window_seconds=local_window_seconds,
     )
 
+    names = FEATURE_NAMES + (RAW_COORDINATE_FEATURE_NAMES if include_raw_coordinates else ())
     tracks: dict[tuple[str, str], list[int]] = defaultdict(list)
     for index, event in enumerate(event_list):
         tracks[(event.corridor_id, event.source_id)].append(index)
@@ -209,8 +248,8 @@ def extract_trajectory_windows(
 
         for index in indices:
             event = event_list[index]
-            row = {name: 0.0 for name in FEATURE_NAMES}
-            mask = {name: False for name in FEATURE_NAMES}
+            row = {name: 0.0 for name in names}
+            mask = {name: False for name in names}
             row["duplicate_timestamp"] = 0.0
             row["implausible_gap"] = 0.0
             mask["duplicate_timestamp"] = True
@@ -296,10 +335,20 @@ def extract_trajectory_windows(
                 row["local_density_150m"] = densities[index]
                 mask["local_density_150m"] = True
 
-            values = tuple(row[name] for name in FEATURE_NAMES)
-            feature_mask = tuple(mask[name] for name in FEATURE_NAMES)
+            if include_raw_coordinates:
+                if current_position is not None:
+                    row["position_x_m"], row["position_y_m"] = current_position
+                    mask["position_x_m"] = mask["position_y_m"] = True
+                if current_z is not None:
+                    row["position_z_m"] = current_z
+                    mask["position_z_m"] = True
+                if heading_valid and current_heading is not None:
+                    row["heading_deg"] = current_heading
+                    mask["heading_deg"] = True
+            values = tuple(row[name] for name in names)
+            feature_mask = tuple(mask[name] for name in names)
             history.append((values, feature_mask))
-            output[index] = _pad_window(history, window_size, event)
+            output[index] = _pad_window(history, window_size, event, len(names))
             previous_event = event
 
     if any(window is None for window in output):

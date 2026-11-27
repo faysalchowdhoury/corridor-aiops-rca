@@ -296,6 +296,13 @@ def main() -> None:
     args = parser.parse_args()
     args.data_dir.mkdir(parents=True, exist_ok=True)
     manifest = download_veremi(args.data_dir)
+    from corridor_aiops.data.parse import verify_veremi_directory
+
+    for check in verify_veremi_directory(args.data_dir / "veremi"):
+        print(
+            f"Ground-truth cross-check passed: {check['archive']} "
+            f"{check['cross_check_sha256']}"
+        )
     manifest.extend(download_tampa(args.data_dir, args.tampa_limit))
     manifest.extend(download_threat_feeds(args.data_dir))
     manifest.append(download_pems(args.data_dir / "pems_bay_2022_01_01.txt.gz"))

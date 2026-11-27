@@ -13,6 +13,7 @@ from corridor_aiops.data.parse import (
     _iter_veremi_archive,
     caltrans_lcs_events,
     read_pems,
+    verify_veremi_directory,
 )
 
 METRIC_NAMES = (
@@ -140,6 +141,7 @@ def _scan_veremi(path: Path) -> dict[str, Any]:
         ):
             train_validation_positive_senders.add(sender_id)
     return {
+        "_split_sender_ids": {split: set(values) for split, values in split_senders.items()},
         "record_count": sum(split_counts.values()),
         "official_split_counts": dict(sorted(split_counts.items())),
         "attacker_label_counts": dict(sorted(label_counts.items())),
@@ -152,6 +154,9 @@ def _scan_veremi(path: Path) -> dict[str, Any]:
             for split, values in sorted(split_timestamps.items())
         },
         "unique_sender_ids_by_split": {
+            split: len(values) for split, values in sorted(split_senders.items())
+        },
+        "composite_sender_clusters_by_split": {
             split: len(values) for split, values in sorted(split_senders.items())
         },
         "sender_ids_shared_between_train_and_test": len(
@@ -199,6 +204,53 @@ def _scan_veremi(path: Path) -> dict[str, Any]:
                 for rows in slice_values
             ),
             default=0,
+        ),
+    }
+
+
+def composite_sender_cluster_audit(
+    sender_sets: dict[str, dict[str, set[str]]],
+) -> dict[str, Any]:
+    """Summarize composite (corridor_id, source_id) clusters across archives.
+
+    ``sender_sets`` maps archive name to split to the set of bare ``source_id`` strings.
+    A collision is a bare ``source_id`` that appears in more than one archive within the
+    same split; composite keys keep those senders as separate bootstrap clusters.
+    """
+    splits = sorted({split for by_split in sender_sets.values() for split in by_split})
+    clusters_by_split = {}
+    collisions_by_split = {}
+    for split in splits:
+        owners: Counter[str] = Counter()
+        total = 0
+        for by_split in sender_sets.values():
+            senders = by_split.get(split, set())
+            total += len(senders)
+            owners.update(senders)
+        clusters_by_split[split] = total
+        collisions_by_split[split] = sum(count > 1 for count in owners.values())
+    overlap = {
+        name: {
+            "train_test_same_archive_source_id_overlap": len(
+                by_split.get("train", set()) & by_split.get("test", set())
+            ),
+            "train_validation_same_archive_source_id_overlap": len(
+                by_split.get("train", set()) & by_split.get("validation", set())
+            ),
+        }
+        for name, by_split in sorted(sender_sets.items())
+    }
+    all_ids = [by_split for by_split in sender_sets.values()]
+    scenario_ids = set().union(*(set().union(*s.values()) for s in all_ids)) if all_ids else set()
+    return {
+        "cluster_identity": "(corridor_id, source_id), corridor_id = <archive>-<split>",
+        "unique_composite_clusters_by_split": clusters_by_split,
+        "cross_archive_source_id_collisions_by_split": collisions_by_split,
+        "train_test_sender_overlap_by_archive": overlap,
+        "unique_bare_source_ids_across_archives_and_splits": len(scenario_ids),
+        "interpretation": (
+            "Both archives replay the same InTAS highway 2 vehicle population, so equal "
+            "source_id strings across archives are kept as distinct composite clusters."
         ),
     }
 
@@ -436,6 +488,9 @@ def run_dataset_audit(
     veremi = {path.name: _scan_veremi(path) for path in veremi_archives}
     if len(veremi) != 2:
         raise ValueError("This audit expects the two documented InTAS highway 2 archives")
+    sender_sets = {name: scan.pop("_split_sender_ids") for name, scan in veremi.items()}
+    composite_audit = composite_sender_cluster_audit(sender_sets)
+    ground_truth_cross_check = verify_veremi_directory(veremi_dir)
 
     tampa = _tampa_summary(data_dir)
     pems = read_pems(data_dir / "pems_bay_2022_01_01.txt.gz")
@@ -504,6 +559,24 @@ def run_dataset_audit(
                 "documentation_url": (
                     "https://github.com/VeReMi-dataset/VeReMi-NextGen/blob/main/Documentation/README.md"
                 ),
+                "composite_sender_cluster_audit": composite_audit,
+                "official_ground_truth_cross_check": {
+                    "status": "PASSED",
+                    "note": (
+                        "The official per-split ground-truth JSON files contain no attacker "
+                        "or attack-type field. Hard checks: archive attack category equals "
+                        "every nested member path; every attacker=0 record matches its "
+                        "same-split official ground-truth position and speed; embedded "
+                        "attacker equals any ground-truth attacker field. A violation "
+                        "raises ValueError."
+                    ),
+                    "archives": ground_truth_cross_check,
+                    "combined_cross_check_sha256": hashlib.sha256(
+                        "".join(
+                            item["cross_check_sha256"] for item in ground_truth_cross_check
+                        ).encode("ascii")
+                    ).hexdigest(),
+                },
                 "metrics": metrics["veremi"],
             },
             "pems_bay": {
@@ -592,6 +665,16 @@ def run_dataset_audit(
                         "note": (
                             "Only the acquired dataReplay and dosAttack subsets are "
                             "available for cross-category holdout."
+                        ),
+                    },
+                    "sender_disjoint_holdout": {
+                        "status": "EVALUABLE",
+                        "cluster_identity": "(corridor_id, source_id); partition by source_id",
+                        "note": (
+                            "Senders are partitioned by bare source_id across both archives "
+                            "and all official splits, which implies zero composite "
+                            "(corridor_id, source_id) overlap. Official temporal split "
+                            "boundaries are not preserved by this partition."
                         ),
                     },
                     "independent_scenario_holdout": {

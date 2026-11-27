@@ -1,0 +1,17 @@
+{
+  "determinism_status": "NOT_COMPLETED",
+  "determinism_claim": "none; no completed second-run comparison exists",
+  "attempts": [
+    {
+      "recorded_at_utc": "2026-11-27T03:32:00+00:00",
+      "outcome": "attempt 1 started 2026-11-26 22:32 local time and was terminated when its controlling session ended; no outputs were written",
+      "detail": ""
+    },
+    {
+      "recorded_at_utc": "2026-11-27T05:00:11.815589+00:00",
+      "outcome": "the first attempt was terminated together with its controlling session and the second ran out of system memory while other workloads shared the machine",
+      "detail": "attempt 2 started 2026-11-26 23:05 local time; numpy _ArrayMemoryError during hist_gradient_boosting seed 43 of the main comparison (7.7 GB RAM, under 1 GB free)"
+    }
+  ],
+  "how_to_complete": "run `corridor-reproduce` with sufficient free memory"
+}
