@@ -71,7 +71,7 @@ Values are mean ± sample std over training seeds; TPR is read from the test ROC
 * **Ablations:** a single-message window and raw coordinates cost 0.03 to 0.07 AUROC and more than 0.1 TPR at 1% FAR. Removing timing and jitter features hurts the Transformer only. Density and masks have small effects.
 * **Sender ranking:** attacker-emitter recall at k = 3 is at most 1.58%, so message detection does not imply emitter identification.
 
-`results/reproduction_audit.json` records the completed second run: 24 of 55,844 numeric values differed, all below 1e-6 and all from random forest, so the outputs are numerically reproducible within that tolerance but not bit-identical. `results/clean_checkout_audit.json` records the clean-clone headline rerun and the Linux ruff and pytest results. No bit-identical determinism claim is made.
+`results/reproduction_audit.json` records the completed second run: 24 of 55,844 numeric values differed, all below 1e-6 and all from random forest, so the outputs are numerically reproducible within that tolerance but not bit-identical. `results/clean_checkout_audit.json` records the clean-clone checks: from a fresh clone, all 360 per-seed headline values matched within 1e-6 (maximum difference 1.1e-16) and all 45 checkpoint hashes matched; on Ubuntu 26.04 (WSL2) with Python 3.12, `ruff check .` passed and `pytest` passed (80 tests). No bit-identical determinism claim is made.
 
 ## Quick start
 
