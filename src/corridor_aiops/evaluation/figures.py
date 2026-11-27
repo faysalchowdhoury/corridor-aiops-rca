@@ -1113,6 +1113,142 @@ def _ablation_and_robustness(
     _save(fig, figure_dir / "fig4_ablation_and_robustness")
 
 
+CATEGORY_STYLES = {
+    "dataReplay": (PALETTE[0], "o"),
+    "dosAttack": (PALETTE[3], "s"),
+}
+
+
+def _attack_specificity(
+    figure_dir: Path,
+    summary: dict[str, Any],
+    diagnostics: dict[str, Any],
+    sensitivity: dict[str, Any],
+) -> None:
+    """Feature direction by attack category and per-seed bootstrap sensitivity."""
+    fig, axes = plt.subplots(
+        1, 3, figsize=(7.16, 3.3), gridspec_kw={"width_ratios": [1.15, 1.0, 1.0]}
+    )
+    features = diagnostics["features"]
+    blocks = list(features["features"].values())
+    ax = axes[0]
+    ax.axvspan(
+        0.5 - features["direction_margin"],
+        0.5 + features["direction_margin"],
+        color=PANEL,
+        zorder=0,
+    )
+    ax.axvline(0.5, color=INK, linewidth=0.7)
+    for row, block in enumerate(blocks):
+        values = [block[f"{c}|train"]["attacker_vs_benign_auroc"] for c in features["archives"]]
+        ax.plot(values, [row - 0.14, row + 0.14], color=FAINT, linewidth=0.8, zorder=1)
+    offsets_a = dict(zip(features["archives"], (-0.14, 0.14), strict=False))
+    for category in features["archives"]:
+        color, marker = CATEGORY_STYLES.get(category, (PALETTE[2], "^"))
+        ax.plot(
+            [block[f"{category}|train"]["attacker_vs_benign_auroc"] for block in blocks],
+            [row + offsets_a.get(category, 0.0) for row in range(len(blocks))],
+            linestyle="none",
+            marker=marker,
+            color=color,
+            markersize=4.6,
+            markeredgecolor="#FFFFFF",
+            markeredgewidth=0.6,
+            label=category,
+            zorder=2,
+        )
+    labels = [
+        block["label"] + (" †" if block["direction_reverses_between_categories"] else "")
+        for block in blocks
+    ]
+    ax.set_yticks(range(len(blocks)), labels)
+    ax.set_ylim(len(blocks) - 0.5, -0.5)
+    ax.set_xlim(0, 1)
+    ax.set_xlabel("Single-feature AUROC, attacker vs. non-malicious (train)")
+    ax.grid(axis="y", visible=False)
+    ax.legend(
+        loc="lower right",
+        bbox_to_anchor=(1.03, 0.0),
+        handlelength=0.6,
+        handletextpad=0.25,
+        borderaxespad=0.0,
+        fontsize=6.2,
+    )
+    _panel_label(ax, "a", "Feature direction by attack")
+
+    seeds = [str(seed) for seed in sensitivity["training_seeds"]]
+    names = [
+        name
+        for name in sensitivity["comparisons"]
+        if summary["models"][name]["supervision_regime"] == "supervised"
+    ]
+    offsets = np.linspace(-0.3, 0.3, len(seeds))
+    for ax, metric, label, panel in (
+        (axes[1], "delta_f1_cyber_vs_benign", "ΔF1, Transformer minus model", "b"),
+        (axes[2], "delta_auroc", "ΔAUROC, Transformer minus model", "c"),
+    ):
+        for row, name in enumerate(names):
+            color = _regime_color(summary, name)
+            per_seed = sensitivity["comparisons"][name][metric]["per_seed"]
+            for offset, seed, marker in zip(offsets, seeds, MARKERS, strict=False):
+                block = per_seed[seed]
+                low, high = block["ci_95pct"]
+                ax.plot(
+                    [low, high],
+                    [row + offset] * 2,
+                    color=color,
+                    linewidth=1.0,
+                    solid_capstyle="round",
+                )
+                ax.plot(
+                    block["mean"],
+                    row + offset,
+                    marker=marker,
+                    color=color,
+                    markersize=3.2,
+                    markeredgecolor="#FFFFFF",
+                    markeredgewidth=0.4,
+                    linestyle="none",
+                )
+        ax.axvline(0, color=INK, linewidth=0.7)
+        ax.set_yticks(range(len(names)), [_display(summary, n) for n in names])
+        for tick, name in zip(ax.get_yticklabels(), names, strict=True):
+            tick.set_color(_regime_color(summary, name))
+        ax.set_ylim(len(names) - 0.5, -0.5)
+        ax.set_xlabel(label)
+        ax.grid(axis="y", visible=False)
+        _panel_label(ax, panel, f"Per-seed bootstrap: {label.split(',')[0]}, supervised")
+    axes[2].set_yticklabels([])
+    handles = [
+        plt.Line2D(
+            [],
+            [],
+            marker=marker,
+            color=MUTED,
+            linestyle="none",
+            markersize=3.5,
+            label=f"seed {seed}",
+        )
+        for seed, marker in zip(seeds, MARKERS, strict=False)
+    ]
+    axes[1].legend(handles=handles, loc="upper left", handletextpad=0.2, fontsize=6.2)
+    fig.text(
+        0.01,
+        -0.03,
+        "(a) † marks features whose attacker direction reverses between categories; grey band "
+        f"is 0.5 ± {features['direction_margin']}. (b, c) percentile 95% intervals from "
+        f"{sensitivity['requested_replicates']:,} paired resamples of "
+        f"{sensitivity['composite_clusters']:,} composite sender clusters, one row per "
+        "training seed; resamples are not independent experiments. Every unsupervised "
+        "detector is below the Transformer for all seeds (per-seed bootstrap table).",
+        fontsize=6.4,
+        color=MUTED,
+        wrap=True,
+    )
+    fig.tight_layout(w_pad=0.8)
+    _save(fig, figure_dir / "fig5_attack_specificity")
+
+
 def generate_figures(
     results_dir: Path = Path("results"), figure_dir: Path = Path("paper/figures")
 ) -> list[Path]:
@@ -1129,7 +1265,18 @@ def generate_figures(
     _curves(figure_dir, summary)
     _localization_and_context(figure_dir, summary)
     _ablation_and_robustness(figure_dir, summary, ablation)
-    return [figure_dir / f"{name}{suffix}" for name in FIGURE_NAMES for suffix in (".pdf", ".png")]
+    names = list(FIGURE_NAMES)
+    diagnostics_path = results_dir / "loao_diagnostics.json"
+    sensitivity_path = results_dir / "seed_bootstrap_sensitivity.json"
+    if diagnostics_path.exists() and sensitivity_path.exists():
+        _attack_specificity(
+            figure_dir,
+            summary,
+            json.loads(diagnostics_path.read_text(encoding="utf-8")),
+            json.loads(sensitivity_path.read_text(encoding="utf-8")),
+        )
+        names.append("fig5_attack_specificity")
+    return [figure_dir / f"{name}{suffix}" for name in names for suffix in (".pdf", ".png")]
 
 
 def main() -> None:

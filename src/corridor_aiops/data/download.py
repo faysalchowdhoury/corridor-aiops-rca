@@ -26,6 +26,15 @@ VEREMI_FILES = (
     "InTAS_highway_2_Validation_groundTruth.json",
     "InTAS_highway_2_Test_ground_truth.json",
 )
+# Independently simulated InTAS scenario in the same Zenodo record, used only as a
+# held-out test scenario (no fitting, normalization, or threshold selection on it).
+# Only the official test split is used, so only its ground-truth file is acquired.
+HELDOUT_SCENARIO = "InTAS_urban_2"
+HELDOUT_VEREMI_FILES = (
+    f"{HELDOUT_SCENARIO}_dataReplay.zip",
+    f"{HELDOUT_SCENARIO}_dosAttack.zip",
+    f"{HELDOUT_SCENARIO}_Test_ground_truth.json",
+)
 TAMPA_RESOURCES = {
     "tampa_bsm.json": (
         "https://data.transportation.gov/resource/nm7w-nvbm.json",
@@ -172,6 +181,59 @@ def download_veremi(data_dir: Path) -> list[dict[str, Any]]:
     return results
 
 
+def download_zenodo_files(
+    filenames: tuple[str, ...], destination_dir: Path, api: str = VEREMI_API
+) -> list[dict[str, Any]]:
+    """Stream files from the official Zenodo record to disk, verifying size and MD5.
+
+    Each file is written to a temporary name and renamed only after its byte count and
+    the MD5 listed in the Zenodo metadata both match; SHA-256 is recorded alongside.
+    """
+    metadata = json.loads(_read_url(api))
+    available = {item["key"]: item for item in metadata["files"]}
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    results = []
+    for filename in filenames:
+        if filename not in available:
+            raise ValueError(f"File is not listed in the official Zenodo record: {filename}")
+        details = available[filename]
+        expected_md5 = details["checksum"].split(":", 1)[-1]
+        destination = destination_dir / filename
+        if not destination.exists():
+            request = urllib.request.Request(
+                f"{api}/files/{filename}/content",
+                headers={"User-Agent": "CorridorAIOps-RCA/0.1"},
+            )
+            with tempfile.NamedTemporaryFile(dir=destination_dir, delete=False) as handle:
+                temporary = Path(handle.name)
+                with urllib.request.urlopen(request, timeout=120) as response:
+                    shutil.copyfileobj(response, handle, length=1024 * 1024)
+            os.replace(temporary, destination)
+        md5 = hashlib.md5()
+        with destination.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                md5.update(chunk)
+        size = destination.stat().st_size
+        if size != details["size"] or md5.hexdigest() != expected_md5:
+            destination.unlink()
+            raise ValueError(
+                f"{filename}: size {size} / MD5 {md5.hexdigest()} do not match Zenodo "
+                f"metadata ({details['size']} / {expected_md5}); file removed"
+            )
+        results.append(
+            {
+                "dataset": "VeReMi NextGen",
+                "filename": filename,
+                "source_url": f"{api}/files/{filename}/content",
+                "bytes": size,
+                "zenodo_md5": expected_md5,
+                "sha256": _sha256(destination),
+                "zenodo_checksum_verified": True,
+            }
+        )
+    return results
+
+
 def download_tampa(data_dir: Path, limit: int = 2000) -> list[dict[str, Any]]:
     if limit < 1:
         raise ValueError("Tampa download limit must be positive")
@@ -293,8 +355,20 @@ def main() -> None:
     )
     parser.add_argument("--data-dir", type=Path, default=Path("data/raw"))
     parser.add_argument("--tampa-limit", type=int, default=2000)
+    parser.add_argument(
+        "--heldout-only",
+        action="store_true",
+        help=f"only acquire the held-out {HELDOUT_SCENARIO} test files into veremi_heldout/",
+    )
     args = parser.parse_args()
     args.data_dir.mkdir(parents=True, exist_ok=True)
+    if args.heldout_only:
+        heldout = download_zenodo_files(HELDOUT_VEREMI_FILES, args.data_dir / "veremi_heldout")
+        (args.data_dir / "veremi_heldout" / "manifest.json").write_text(
+            json.dumps(heldout, indent=2) + "\n", encoding="utf-8"
+        )
+        print(json.dumps(heldout, indent=2))
+        return
     manifest = download_veremi(args.data_dir)
     from corridor_aiops.data.parse import verify_veremi_directory
 

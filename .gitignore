@@ -17,3 +17,4 @@ paper/main.fls
 paper/main.synctex.gz
 *.egg-info/
 results_repro_check/
+results/scores/*.npz

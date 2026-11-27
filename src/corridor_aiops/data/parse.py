@@ -6,7 +6,7 @@ import io
 import json
 import math
 import zipfile
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
@@ -98,8 +98,11 @@ def _finite_metric(value: Any) -> tuple[float, float]:
 
 
 def _iter_veremi_archive(
-    payload: bytes, inherited_split: str | None = None
+    payload: bytes,
+    inherited_split: str | None = None,
+    splits: frozenset[str] | None = None,
 ) -> Iterator[tuple[str, str, int, dict[str, Any]]]:
+    """Yield (split, file id, index, record); ``splits`` skips other official splits unread."""
     try:
         archive = zipfile.ZipFile(io.BytesIO(payload))
     except zipfile.BadZipFile as error:
@@ -109,9 +112,11 @@ def _iter_veremi_archive(
             if member.endswith("/"):
                 continue
             split = _dataset_split(member, inherited_split)
+            if splits is not None and split is not None and split not in splits:
+                continue
             content = archive.read(member)
             if member.lower().endswith(".zip"):
-                yield from _iter_veremi_archive(content, split)
+                yield from _iter_veremi_archive(content, split, splits)
             elif member.lower().endswith(".json"):
                 if split is None:
                     raise ValueError(
@@ -185,6 +190,7 @@ def cross_check_veremi_ground_truth(
     ground_truth_paths: dict[str, Path],
     *,
     tolerance: float = 1e-6,
+    splits: Iterable[str] | None = None,
 ) -> dict[str, Any]:
     """Cross-check embedded VeReMi labels against the official ground-truth files.
 
@@ -201,10 +207,14 @@ def cross_check_veremi_ground_truth(
 
     Any violation raises ``ValueError``. Attacker-labeled records are summarized
     descriptively because manipulated or injected messages are expected to diverge.
+    ``splits`` restricts the record checks to the named official splits, for example
+    a held-out scenario whose test split alone is used.
     """
+    all_splits = frozenset(("train", "validation", "test"))
+    selected = frozenset(splits) if splits is not None else all_splits
     archive_path = Path(archive_path)
     scenario, category = veremi_archive_identity(archive_path)
-    missing = {"train", "validation", "test"} - set(ground_truth_paths)
+    missing = set(selected) - set(ground_truth_paths)
     if missing:
         raise ValueError(f"Missing official ground-truth files for splits: {sorted(missing)}")
     payload = archive_path.read_bytes()
@@ -224,14 +234,17 @@ def cross_check_veremi_ground_truth(
     ground_truth: dict[tuple[str, str, str, str], dict[str, Any]] = {}
     file_digests = {}
     for split, path in sorted(ground_truth_paths.items()):
+        if split not in selected:
+            continue
         raw = Path(path).read_bytes()
         file_digests[split] = hashlib.sha256(raw).hexdigest()
         for record in _records_from_json(raw):
             ground_truth[_broadcast_key(split, record)] = record
+        del raw
 
     counts: dict[str, dict[str, int]] = {}
     violations: list[str] = []
-    for split, _, _, record in _iter_veremi_archive(payload):
+    for split, _, _, record in _iter_veremi_archive(payload, splits=selected):
         if record.get("attacker") not in (0, 1, "0", "1"):
             raise ValueError("VeReMi record is missing the official attacker label")
         label = int(record["attacker"])
@@ -271,7 +284,9 @@ def cross_check_veremi_ground_truth(
         "attack_category": category,
         "attack_category_member_paths": sorted(member_categories),
         "ground_truth_files": {
-            split: Path(path).name for split, path in sorted(ground_truth_paths.items())
+            split: Path(path).name
+            for split, path in sorted(ground_truth_paths.items())
+            if split in selected
         },
         "ground_truth_sha256": file_digests,
         "ground_truth_has_attacker_field": any(
@@ -287,6 +302,8 @@ def cross_check_veremi_ground_truth(
         ],
         "status": "PASSED",
     }
+    if selected != all_splits:
+        summary["splits_checked"] = sorted(selected)
     summary["cross_check_sha256"] = hashlib.sha256(
         json.dumps(summary, sort_keys=True).encode("utf-8")
     ).hexdigest()
@@ -306,10 +323,18 @@ def verify_veremi_directory(directory: Path) -> list[dict[str, Any]]:
     return results
 
 
-def veremi_events(path: Path) -> Iterator[CorridorEvent]:
-    """Read one earliest receive observation for each published BSM broadcast."""
+def veremi_events(
+    path: Path, splits: Iterable[str] | None = None
+) -> Iterator[CorridorEvent]:
+    """Read one earliest receive observation for each published BSM broadcast.
+
+    ``splits`` restricts parsing to the named official splits (default: all).
+    """
+    selected = frozenset(splits) if splits is not None else None
     events: dict[tuple[str, str, str], CorridorEvent] = {}
-    for split, record_file_id, record_index, record in _iter_veremi_archive(path.read_bytes()):
+    for split, record_file_id, record_index, record in _iter_veremi_archive(
+        path.read_bytes(), splits=selected
+    ):
         if "attacker" not in record or record["attacker"] not in (0, 1, "0", "1"):
             raise ValueError("VeReMi record is missing the official attacker label")
         try:

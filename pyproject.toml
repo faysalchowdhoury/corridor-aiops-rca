@@ -31,6 +31,9 @@ corridor-audit = "corridor_aiops.data.audit:main"
 corridor-benchmark = "corridor_aiops.evaluation.benchmark:main"
 corridor-figures = "corridor_aiops.evaluation.figures:main"
 corridor-reproduce = "corridor_aiops.evaluation.reproduce:main"
+corridor-sensitivity = "corridor_aiops.evaluation.sensitivity:main"
+corridor-heldout = "corridor_aiops.evaluation.heldout:main"
+corridor-clean-audit = "corridor_aiops.evaluation.clean_checkout:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

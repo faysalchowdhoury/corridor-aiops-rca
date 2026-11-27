@@ -217,6 +217,28 @@ ABLATION_CONFIGS = (
 )
 
 
+def build_event_table(events: list, archive_of_event: Sequence[str]) -> EventTable:
+    """Causal windows and arrays for parsed events (windows never cross corridor_id)."""
+    windows = extract_trajectory_windows(
+        events, window_size=FULL_WINDOW, include_raw_coordinates=True
+    )
+    values = np.asarray([window.values for window in windows], dtype=np.float32)
+    if not np.isfinite(values).all():
+        raise ValueError("Trajectory feature extraction produced non-finite data")
+    return EventTable(
+        events=events,
+        values=values,
+        feature_mask=np.asarray([window.feature_mask for window in windows], dtype=bool),
+        step_mask=np.asarray([window.time_mask for window in windows], dtype=bool),
+        labels=np.asarray([event.label == "cyber" for event in events], dtype=np.int64),
+        corridor=np.asarray([event.corridor_id for event in events]),
+        source=np.asarray([event.source_id for event in events]),
+        archive=np.asarray(archive_of_event),
+        split=np.asarray([event.corridor_id.rsplit("-", 1)[-1] for event in events]),
+        feature_names=FEATURE_NAMES + RAW_COORDINATE_FEATURE_NAMES,
+    )
+
+
 def load_event_table(data_dir: Path) -> tuple[EventTable, dict[str, int]]:
     archives = sorted(Path(data_dir).glob("*.zip"))
     if not archives:
@@ -232,24 +254,7 @@ def load_event_table(data_dir: Path) -> tuple[EventTable, dict[str, int]]:
         record_counts[archive.name] = len(archive_events)
         events.extend(archive_events)
         archive_of_event.extend([category] * len(archive_events))
-    windows = extract_trajectory_windows(
-        events, window_size=FULL_WINDOW, include_raw_coordinates=True
-    )
-    values = np.asarray([window.values for window in windows], dtype=np.float32)
-    if not np.isfinite(values).all():
-        raise ValueError("Trajectory feature extraction produced non-finite data")
-    table = EventTable(
-        events=events,
-        values=values,
-        feature_mask=np.asarray([window.feature_mask for window in windows], dtype=bool),
-        step_mask=np.asarray([window.time_mask for window in windows], dtype=bool),
-        labels=np.asarray([event.label == "cyber" for event in events], dtype=np.int64),
-        corridor=np.asarray([event.corridor_id for event in events]),
-        source=np.asarray([event.source_id for event in events]),
-        archive=np.asarray(archive_of_event),
-        split=np.asarray([event.corridor_id.rsplit("-", 1)[-1] for event in events]),
-        feature_names=FEATURE_NAMES + RAW_COORDINATE_FEATURE_NAMES,
-    )
+    table = build_event_table(events, archive_of_event)
     observed = set(table.split.tolist())
     if not set(SPLITS).issubset(observed):
         raise ValueError(f"Official train, validation, and test splits required; saw {observed}")

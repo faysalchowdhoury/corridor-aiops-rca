@@ -1,0 +1,20 @@
+\begin{tabular}{lccccccc}
+\toprule
+& \multicolumn{4}{c}{Held-out \texttt{InTAS\_urban\_2} test (pooled)} & \texttt{dataReplay} & \texttt{dosAttack} & In-scenario \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-7}
+Model & F1 & AUROC & Recall & FAR (\%) & AUROC & AUROC & AUROC \\
+\midrule
+\multicolumn{8}{l}{\textit{Unsupervised / one-class (fit on non-malicious records)}} \\
+Robust rules & 0.843 $\pm$ 0.000 & 0.876 $\pm$ 0.000 & 0.808 & 5.35 & 0.569 $\pm$ 0.000 & 0.964 $\pm$ 0.000 & 0.789 \\
+Isolation forest & 0.769 $\pm$ 0.022 & 0.857 $\pm$ 0.010 & 0.831 & 16.41 & 0.615 $\pm$ 0.005 & 0.925 $\pm$ 0.013 & 0.797 \\
+One-class SVM & 0.883 $\pm$ 0.000 & 0.900 $\pm$ 0.000 & 0.801 & 0.65 & 0.558 $\pm$ 0.000 & 0.997 $\pm$ 0.000 & 0.891 \\
+LSTM autoencoder & 0.916 $\pm$ 0.000 & 0.965 $\pm$ 0.000 & 0.940 & 5.49 & 0.881 $\pm$ 0.001 & 0.989 $\pm$ 0.000 & 0.929 \\
+\midrule
+\multicolumn{8}{l}{\textit{Supervised (fit on training labels)}} \\
+Logistic regression & 0.906 $\pm$ 0.000 & 0.988 $\pm$ 0.000 & 0.954 & 7.45 & 0.948 $\pm$ 0.000 & 0.999 $\pm$ 0.000 & 0.985 \\
+Random forest & 0.971 $\pm$ 0.000 & 0.996 $\pm$ 0.000 & 0.962 & 0.99 & 0.982 $\pm$ 0.000 & 1.000 $\pm$ 0.000 & 0.993 \\
+Hist. gradient boosting & 0.968 $\pm$ 0.000 & 0.996 $\pm$ 0.000 & 0.961 & 1.25 & 0.982 $\pm$ 0.000 & 1.000 $\pm$ 0.000 & 0.993 \\
+Supervised MLP & 0.926 $\pm$ 0.008 & 0.992 $\pm$ 0.001 & 0.967 & 5.93 & 0.966 $\pm$ 0.002 & 1.000 $\pm$ 0.000 & 0.988 \\
+Tabular Transformer & 0.936 $\pm$ 0.008 & 0.993 $\pm$ 0.001 & 0.970 & 5.04 & 0.968 $\pm$ 0.003 & 0.999 $\pm$ 0.000 & 0.989 \\
+\bottomrule
+\end{tabular}

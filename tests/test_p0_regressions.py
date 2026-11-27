@@ -16,6 +16,7 @@ from sklearn.metrics import f1_score, roc_auc_score
 from corridor_aiops.data.audit import composite_sender_cluster_audit
 from corridor_aiops.data.parse import (
     cross_check_veremi_ground_truth,
+    veremi_events,
     veremi_ground_truth_paths,
 )
 from corridor_aiops.data.tracks import attach_attacker_labels, build_v2x_graph_slices
@@ -259,6 +260,50 @@ def test_ground_truth_cross_check_rejects_attack_type_mismatch(tmp_path) -> None
 
     with pytest.raises(ValueError, match="Attack-type mismatch"):
         cross_check_veremi_ground_truth(archive, veremi_ground_truth_paths(tmp_path, "S"))
+
+
+def test_veremi_events_split_filter_reads_only_selected_split(tmp_path) -> None:
+    archive = _write_archive(tmp_path, "dataReplay", "dataReplay", _split_records(7.0))
+
+    everything = list(veremi_events(archive))
+    test_only = list(veremi_events(archive, splits=("test",)))
+
+    assert {event.corridor_id.rsplit("-", 1)[-1] for event in everything} == {
+        "train",
+        "validation",
+        "test",
+    }
+    assert {event.corridor_id.rsplit("-", 1)[-1] for event in test_only} == {"test"}
+    assert [e.event_id for e in test_only] == [
+        e.event_id for e in everything if e.corridor_id.endswith("-test")
+    ]
+
+
+def test_ground_truth_cross_check_can_audit_the_test_split_alone(tmp_path) -> None:
+    archive = _write_archive(tmp_path, "dataReplay", "dataReplay", _split_records(7.0))
+    (tmp_path / "S_Test_ground_truth.json").write_text(
+        json.dumps([_ground_truth("veh_1", 3, 7.0), _ground_truth("veh_9", 4, 1.0)]),
+        encoding="utf-8",
+    )
+
+    paths = veremi_ground_truth_paths(tmp_path, "S")
+    assert set(paths) == {"test"}
+    with pytest.raises(ValueError, match="Missing official ground-truth files"):
+        cross_check_veremi_ground_truth(archive, paths)
+    result = cross_check_veremi_ground_truth(archive, paths, splits=("test",))
+
+    assert result["status"] == "PASSED"
+    assert result["splits_checked"] == ["test"]
+    assert set(result["record_outcomes_by_split"]) == {"test"}
+
+
+def test_full_ground_truth_audit_digest_has_no_split_restriction_field(tmp_path) -> None:
+    archive = _write_archive(tmp_path, "dataReplay", "dataReplay", _split_records(7.0))
+    _write_ground_truth(tmp_path, [_ground_truth("veh_1", 3, 7.0), _ground_truth("veh_9", 4, 1.0)])
+
+    result = cross_check_veremi_ground_truth(archive, veremi_ground_truth_paths(tmp_path, "S"))
+
+    assert "splits_checked" not in result
 
 
 def test_ground_truth_cross_check_rejects_explicit_attacker_label_mismatch(tmp_path) -> None:
