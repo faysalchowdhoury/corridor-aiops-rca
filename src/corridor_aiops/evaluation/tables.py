@@ -12,6 +12,11 @@ GROUPS = (
 )
 
 
+def scientific(value: float) -> str:
+    """Compact scientific notation for small differences; an exact zero prints as 0."""
+    return "0" if value == 0 else f"{value:.1e}"
+
+
 def _escape(text: str) -> str:
     return text.replace("_", "\\_").replace("%", "\\%").replace("&", "\\&")
 

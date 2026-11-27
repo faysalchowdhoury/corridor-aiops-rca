@@ -83,6 +83,7 @@
           "valid_messages": 26286
         },
         "benign_cross_archive_auroc_train": 0.5081595923221915,
+        "benign_median_pooled_train": 14.450921058654785,
         "direction_by_archive_train": {
           "dataReplay": 0,
           "dosAttack": 0
@@ -149,6 +150,7 @@
           "valid_messages": 26286
         },
         "benign_cross_archive_auroc_train": 0.49917787171203637,
+        "benign_median_pooled_train": 0.06650841236114502,
         "direction_by_archive_train": {
           "dataReplay": 0,
           "dosAttack": 0
@@ -215,6 +217,7 @@
           "valid_messages": 25613
         },
         "benign_cross_archive_auroc_train": 0.4997836921971851,
+        "benign_median_pooled_train": 1.0000038146972656,
         "direction_by_archive_train": {
           "dataReplay": 0,
           "dosAttack": -1
@@ -281,6 +284,7 @@
           "valid_messages": 24949
         },
         "benign_cross_archive_auroc_train": 0.4988912588325156,
+        "benign_median_pooled_train": 0.0003632187726907432,
         "direction_by_archive_train": {
           "dataReplay": 0,
           "dosAttack": 1
@@ -347,6 +351,7 @@
           "valid_messages": 25613
         },
         "benign_cross_archive_auroc_train": 0.5066774115943931,
+        "benign_median_pooled_train": 14.484954833984375,
         "direction_by_archive_train": {
           "dataReplay": 1,
           "dosAttack": -1
@@ -413,6 +418,7 @@
           "valid_messages": 25613
         },
         "benign_cross_archive_auroc_train": 0.5,
+        "benign_median_pooled_train": 0.0,
         "direction_by_archive_train": {
           "dataReplay": 0,
           "dosAttack": 0
@@ -479,6 +485,7 @@
           "valid_messages": 25613
         },
         "benign_cross_archive_auroc_train": 0.5080715220536269,
+        "benign_median_pooled_train": 0.6195994019508362,
         "direction_by_archive_train": {
           "dataReplay": 1,
           "dosAttack": -1
@@ -545,6 +552,7 @@
           "valid_messages": 25613
         },
         "benign_cross_archive_auroc_train": 0.505672747030673,
+        "benign_median_pooled_train": 0.016907086595892906,
         "direction_by_archive_train": {
           "dataReplay": 1,
           "dosAttack": -1
@@ -611,6 +619,7 @@
           "valid_messages": 26286
         },
         "benign_cross_archive_auroc_train": 0.47558268157201383,
+        "benign_median_pooled_train": 2.0,
         "direction_by_archive_train": {
           "dataReplay": 1,
           "dosAttack": 0
@@ -677,6 +686,7 @@
           "valid_messages": 26286
         },
         "benign_cross_archive_auroc_train": 0.5,
+        "benign_median_pooled_train": 0.0,
         "direction_by_archive_train": {
           "dataReplay": 0,
           "dosAttack": 0
@@ -743,6 +753,7 @@
           "valid_messages": 26286
         },
         "benign_cross_archive_auroc_train": 0.4998468003915892,
+        "benign_median_pooled_train": 0.0,
         "direction_by_archive_train": {
           "dataReplay": 0,
           "dosAttack": 0

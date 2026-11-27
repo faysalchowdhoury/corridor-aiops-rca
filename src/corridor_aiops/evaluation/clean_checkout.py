@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from corridor_aiops.evaluation.tables import scientific
+
 HEADLINE_METRICS = (
     "f1_cyber_vs_benign",
     "auroc",
@@ -101,10 +103,10 @@ def write_sentence(audit: dict[str, Any], path: Path) -> None:
         + (
             f"All {_count(head['per_seed_values_compared'])} per-seed headline values "
             f"matched the reported results within {head['tolerance']:.0e} "
-            f"(maximum absolute difference {head['max_abs_delta']:.1e}), "
+            f"(maximum absolute difference {scientific(head['max_abs_delta'])}), "
             f"{head['checkpoint_hashes_matched']} of {head['checkpoint_hashes_compared']} "
             "checkpoint hashes matched, and the largest bootstrap-interval difference was "
-            f"{head['bootstrap_interval_max_abs_delta']:.1e}. "
+            f"{scientific(head['bootstrap_interval_max_abs_delta'])}. "
             if reproduced
             else f"{head['values_over_tolerance']} of {head['per_seed_values_compared']} "
             "per-seed headline values differed by more than the tolerance; see "

@@ -44,6 +44,7 @@ from corridor_aiops.evaluation.tables import (
     _escape,
     _ms,
     _write,
+    scientific,
 )
 
 THRESHOLD_CHECK_TOLERANCE = 1e-6
@@ -316,7 +317,7 @@ def write_heldout_tables(
     define("ResHeldoutThresholdStatus", result["threshold_verification"]["status"])
     define(
         "ResHeldoutThresholdMaxDelta",
-        f"{result['threshold_verification']['max_abs_delta']:.1e}",
+        scientific(result["threshold_verification"]["max_abs_delta"]),
     )
     bootstrap = result["composite_cluster_bootstrap"]
     define("ResHeldoutBootValid", count(bootstrap["valid_replicates"]))

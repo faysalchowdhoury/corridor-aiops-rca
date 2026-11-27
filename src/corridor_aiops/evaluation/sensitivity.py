@@ -57,6 +57,7 @@ from corridor_aiops.evaluation.tables import (
     _escape,
     _write,
     generalization_focus_models,
+    scientific,
     write_text_macros,
 )
 
@@ -465,6 +466,9 @@ def feature_diagnostics(table: EventTable) -> dict[str, Any]:
         block["benign_cross_archive_auroc_train"] = _auroc(
             np.r_[np.zeros(len(a)), np.ones(len(b))], np.r_[current[a, column], current[b, column]]
         )
+        block["benign_median_pooled_train"] = float(
+            np.median(np.r_[current[a, column], current[b, column]])
+        )
         directions = []
         for archive in archives:
             auroc = block[f"{archive}|train"]["attacker_vs_benign_auroc"]
@@ -682,7 +686,7 @@ def _feature_table(diagnostics: dict[str, Any]) -> list[str]:
     for block in features["features"].values():
         left = block[f"{a}|train"]
         right = block[f"{b}|train"]
-        benign = np.median([left["benign_median"], right["benign_median"]])
+        benign = block["benign_median_pooled_train"]
         marker = "$^\\dagger$" if block["direction_reverses_between_categories"] else ""
         body.append(
             f"{block['label']}{marker} & "
@@ -762,7 +766,7 @@ def _write_macros(
     define("ResSeedBootComparisons", sensitivity["comparison_count"])
     define(
         "ResSeedBootFirstSeedDelta",
-        f"{sensitivity['first_seed_matches_benchmark_summary_max_abs_ci_delta']:.1e}",
+        scientific(sensitivity["first_seed_matches_benchmark_summary_max_abs_ci_delta"]),
     )
     for name, metrics in sensitivity["comparisons"].items():
         tag = MACRO_MODEL_NAMES[name]
