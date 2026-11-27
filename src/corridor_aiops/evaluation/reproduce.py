@@ -265,7 +265,12 @@ def write_reproduction_macros(audit: dict[str, Any], path: Path) -> None:
     tolerance = audit.get("numerical_tolerance", NUMERICAL_TOLERANCE)
     within = audit["max_abs_numeric_delta"] <= tolerance
     affected = sorted(
-        {name for name in MODEL_NAMES for item in audit["nonzero_deltas"] if name in item["path"]}
+        {
+            name
+            for name in MODEL_NAMES
+            for item in audit.get("nonzero_deltas", [])
+            if name in item["path"]
+        }
     )
     status = audit["determinism_status"].replace("_", " ").lower()
     sentence = (
