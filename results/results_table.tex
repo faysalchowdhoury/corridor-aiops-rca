@@ -1,9 +1,11 @@
 \begin{tabular}{lrrrr}
 \toprule
-Model & F1 & AUROC & FAR (\%) & ms/record \\
+Model & F1 & AUROC & FAR (\%) & ms/event \\
 \midrule
-isolation\_forest & 0.369 & 0.491 & 47.5\% & 0.0037 \\
-one\_class\_svm & 0.483 & 0.525 & 100.0\% & 0.2813 \\
-rules & 0.377 & 0.496 & 49.8\% & 0.0001 \\
+isolation\_forest & 0.705 & 0.809 & 26.26 & 0.01844 \\
+one\_class\_svm & 0.854 & 0.891 & 2.67 & 0.14044 \\
+robust\_threshold\_rules & 0.675 & 0.789 & 29.74 & 0.00030 \\
+lstm\_autoencoder & 0.860 & 0.932 & 9.39 & 0.04006 \\
+tabular\_transformer & 0.932 & 0.990 & 3.59 & 0.05707 \\
 \bottomrule
 \end{tabular}

@@ -49,3 +49,85 @@ class CorridorLogTransformer(nn.Module):
             "masked_token_logits": self.mask_head(encoded),
             "hidden_states": encoded,
         }
+
+
+class TabularTransformer(nn.Module):
+    """Causal sequence classifier for structured telemetry without text inputs."""
+
+    def __init__(
+        self,
+        feature_count: int,
+        *,
+        hidden_size: int = 64,
+        heads: int = 4,
+        layers: int = 2,
+        max_steps: int = 32,
+        dropout: float = 0.1,
+    ) -> None:
+        super().__init__()
+        if feature_count < 1:
+            raise ValueError("feature_count must be positive")
+        if hidden_size % heads:
+            raise ValueError("hidden_size must be divisible by heads")
+        if max_steps < 1:
+            raise ValueError("max_steps must be positive")
+        self.input_projection = nn.Linear(feature_count * 2, hidden_size)
+        self.position_embedding = nn.Embedding(max_steps, hidden_size)
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=hidden_size,
+            nhead=heads,
+            dim_feedforward=hidden_size * 4,
+            dropout=dropout,
+            batch_first=True,
+            norm_first=True,
+        )
+        self.encoder = nn.TransformerEncoder(
+            encoder_layer,
+            num_layers=layers,
+            enable_nested_tensor=False,
+        )
+        self.classifier = nn.Linear(hidden_size, 1)
+
+    def forward(
+        self,
+        telemetry: torch.Tensor,
+        feature_mask: torch.Tensor,
+        step_mask: torch.Tensor,
+    ) -> dict[str, torch.Tensor]:
+        if telemetry.ndim != 3:
+            raise ValueError("telemetry must have shape [batch, steps, features]")
+        if feature_mask.shape != telemetry.shape:
+            raise ValueError("feature_mask must have the same shape as telemetry")
+        if step_mask.shape != telemetry.shape[:2]:
+            raise ValueError("step_mask must have shape [batch, steps]")
+        batch_size, step_count, _ = telemetry.shape
+        if step_count < 1 or step_count > self.position_embedding.num_embeddings:
+            raise ValueError("telemetry step count is outside the configured position range")
+
+        observed_features = feature_mask.to(telemetry.dtype)
+        values = telemetry * observed_features
+        positions = torch.arange(step_count, device=telemetry.device)
+        encoded = self.input_projection(
+            torch.cat((values, observed_features), dim=-1)
+        ) + self.position_embedding(positions).unsqueeze(0)
+        valid_steps = step_mask.bool()
+        safe_steps = valid_steps.clone()
+        safe_steps[~valid_steps.any(dim=-1), 0] = True
+        causal_mask = torch.triu(
+            torch.ones(step_count, step_count, dtype=torch.bool, device=telemetry.device),
+            diagonal=1,
+        )
+        states = self.encoder(
+            encoded,
+            mask=causal_mask,
+            src_key_padding_mask=~safe_steps,
+        )
+        last_valid = torch.where(
+            valid_steps, positions.unsqueeze(0), -1
+        ).amax(dim=-1).clamp(min=0)
+        pooled = states[torch.arange(batch_size, device=telemetry.device), last_valid]
+        pooled = pooled * valid_steps.any(dim=-1, keepdim=True).to(pooled.dtype)
+        return {
+            "detection_logits": self.classifier(pooled).squeeze(-1),
+            "hidden_states": states,
+        }

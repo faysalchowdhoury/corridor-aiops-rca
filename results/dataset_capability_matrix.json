@@ -1,0 +1,683 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-11-27T00:06:56.376679+00:00",
+  "repository_commit_sha": "24b6550b596f159641fd90fe51b04153805fd2f7",
+  "audit_script": "corridor_aiops.data.audit.run_dataset_audit",
+  "audit_script_sha256": "9b35eeadab2d9759853e0a70bac79c568513ac89083857c695233914d1e02902",
+  "repository_worktree_dirty": true,
+  "source_manifest_sha256": "7dbafc752f31e4ce5936bb8e56c729f77bf9972707d5e4938f2bfef404fc35eb",
+  "verified_source_files": {
+    "InTAS_highway_2_dataReplay.zip": {
+      "sha256": "08d84f96602c8812be064375b3a57dee2c9f233635eeffaf44c6810609613bea",
+      "path": "veremi/InTAS_highway_2_dataReplay.zip",
+      "bytes": 19733975
+    },
+    "InTAS_highway_2_dosAttack.zip": {
+      "sha256": "66fbcad8467c4f38da78548aa68bc8c23452c7b1f80262313ff62d9b47b2133c",
+      "path": "veremi/InTAS_highway_2_dosAttack.zip",
+      "bytes": 21935080
+    },
+    "InTAS_highway_2_Train_groundTruth.json": {
+      "sha256": "484037d8cf4ce7586c26d5ac0371bec8c690e5a54c11c2e0fea2f45b38a2aa17",
+      "path": "veremi/InTAS_highway_2_Train_groundTruth.json",
+      "bytes": 18381874
+    },
+    "InTAS_highway_2_Validation_groundTruth.json": {
+      "sha256": "57fc03947f791eb8e60db8d078f0cfb03b632f3fd5d7e2dd8555318129fea383",
+      "path": "veremi/InTAS_highway_2_Validation_groundTruth.json",
+      "bytes": 6713056
+    },
+    "InTAS_highway_2_Test_ground_truth.json": {
+      "sha256": "445e862942c3ecf4a9957f68a61518524c95d6cae78bfaee0f9846e95306c67b",
+      "path": "veremi/InTAS_highway_2_Test_ground_truth.json",
+      "bytes": 9838094
+    },
+    "tampa_bsm.json": {
+      "sha256": "9c186129d85f2f281d9179cfa7450edb95361ccddf9a3abec13d7a05a1b7244a",
+      "path": "tampa/tampa_bsm.json",
+      "bytes": 1241749
+    },
+    "tampa_spat.json": {
+      "sha256": "4b929a28a26b04d8a4d3b9c659a4993967f557712cf559d5d9f28987142e2725",
+      "path": "tampa/tampa_spat.json",
+      "bytes": 960402
+    },
+    "cisa_kev.json": {
+      "sha256": "a76360009e4a65794a2b8073df5475f7a787a3bb83c3bfad2b0c3434a067631a",
+      "path": "threat_intel/cisa_kev.json",
+      "bytes": 1898186
+    },
+    "ics_attack.json": {
+      "sha256": "3f6448369f9135ade84ff6437479441530d0b262f910dca991879a7146b524ff",
+      "path": "threat_intel/ics_attack.json",
+      "bytes": 5291092
+    },
+    "PeMS-BAY District 4 station 5-minute data": {
+      "sha256": "b928a58474aeeb194d6fa08dd0cf0d6c6902519c43a347c0549034e6f5710e88",
+      "path": "pems_bay_2022_01_01.txt.gz",
+      "bytes": 19379072
+    },
+    "Caltrans Planned Lane Closures": {
+      "sha256": "fcb858e58ca00f60a7488e1d34a9d47d6df8626fd86b1b5dbd95bff8a90f77f4",
+      "path": "caltrans/caltrans_lcs_d4_alameda_us80.html",
+      "bytes": 11037
+    }
+  },
+  "datasets": {
+    "veremi": {
+      "dataset_name": "VeReMi NextGen",
+      "dataset_version": "v1.0.0 / Zenodo record 19665762",
+      "source_url": "https://doi.org/10.5281/zenodo.19665762",
+      "attack_categories_in_acquired_subset": [
+        "dataReplay",
+        "dosAttack"
+      ],
+      "archives": {
+        "InTAS_highway_2_dataReplay.zip": {
+          "record_count": 99937,
+          "official_split_counts": {
+            "test": 44259,
+            "train": 37701,
+            "validation": 17977
+          },
+          "attacker_label_counts": {
+            "0": 81441,
+            "1": 18496
+          },
+          "attacker_label_counts_by_split": {
+            "test": {
+              "0": 35516,
+              "1": 8743
+            },
+            "train": {
+              "0": 31160,
+              "1": 6541
+            },
+            "validation": {
+              "0": 14765,
+              "1": 3212
+            }
+          },
+          "official_split_time_ns_min_max": {
+            "test": [
+              7201095409339,
+              14399361310428
+            ],
+            "train": [
+              3601262160543,
+              12599442102538
+            ],
+            "validation": [
+              12600318553476,
+              14399478663471
+            ]
+          },
+          "unique_sender_ids_by_split": {
+            "test": 476,
+            "train": 482,
+            "validation": 152
+          },
+          "sender_ids_shared_between_train_and_test": 180,
+          "archive_attack_category": "dataReplay",
+          "observed_record_fields": [
+            "attacker",
+            "messageID",
+            "rcvTime",
+            "receiver",
+            "sendTime",
+            "sender",
+            "sender_alias",
+            "sender_id"
+          ],
+          "unique_sender_ids": 841,
+          "unique_broadcasts_by_split": {
+            "test": 18892,
+            "train": 19186,
+            "validation": 7023
+          },
+          "attacker_label_counts_by_unique_broadcast": {
+            "test": {
+              "0": 15612,
+              "1": 3280
+            },
+            "train": {
+              "0": 16137,
+              "1": 3049
+            },
+            "validation": {
+              "0": 5756,
+              "1": 1267
+            }
+          },
+          "attacker_label_zero_to_one_transitions_by_split": {
+            "test": 133,
+            "train": 137,
+            "validation": 43
+          },
+          "test_positive_sender_ids": 95,
+          "test_positive_sender_ids_also_positive_in_train_or_validation": 13,
+          "broadcasts_observed_in_multiple_record_files": 27643,
+          "raw_record_copies_after_unique_broadcast_deduplication": 54836,
+          "receive_time_ns_min_max": [
+            3601262160543,
+            14399478663471
+          ],
+          "receive_time_unit": "nanoseconds, simulator time (not UTC wall-clock time)",
+          "sender_position_m_ranges": [
+            [
+              216148.97476425322,
+              216797.9402288795
+            ],
+            [
+              449728.3244924409,
+              454215.26915264525
+            ],
+            [
+              0.0,
+              0.0
+            ]
+          ],
+          "one_second_slices": 12519,
+          "multi_vehicle_one_second_slices": 12485,
+          "multi_vehicle_slices_with_attacker_labels": 5395,
+          "max_attacker_emitters_in_one_second_slice": 6
+        },
+        "InTAS_highway_2_dosAttack.zip": {
+          "record_count": 142129,
+          "official_split_counts": {
+            "test": 60718,
+            "train": 55290,
+            "validation": 26121
+          },
+          "attacker_label_counts": {
+            "0": 79797,
+            "1": 62332
+          },
+          "attacker_label_counts_by_split": {
+            "test": {
+              "0": 36066,
+              "1": 24652
+            },
+            "train": {
+              "0": 29569,
+              "1": 25721
+            },
+            "validation": {
+              "0": 14162,
+              "1": 11959
+            }
+          },
+          "official_split_time_ns_min_max": {
+            "test": [
+              7201095409339,
+              14399361310428
+            ],
+            "train": [
+              3601262160543,
+              12599442102538
+            ],
+            "validation": [
+              12600318553476,
+              14399811996805
+            ]
+          },
+          "unique_sender_ids_by_split": {
+            "test": 476,
+            "train": 482,
+            "validation": 152
+          },
+          "sender_ids_shared_between_train_and_test": 180,
+          "archive_attack_category": "dosAttack",
+          "observed_record_fields": [
+            "attacker",
+            "messageID",
+            "rcvTime",
+            "receiver",
+            "sendTime",
+            "sender",
+            "sender_alias",
+            "sender_id"
+          ],
+          "unique_sender_ids": 841,
+          "unique_broadcasts_by_split": {
+            "test": 26286,
+            "train": 27625,
+            "validation": 10153
+          },
+          "attacker_label_counts_by_unique_broadcast": {
+            "test": {
+              "0": 15293,
+              "1": 10993
+            },
+            "train": {
+              "0": 15224,
+              "1": 12401
+            },
+            "validation": {
+              "0": 5535,
+              "1": 4618
+            }
+          },
+          "attacker_label_zero_to_one_transitions_by_split": {
+            "test": 95,
+            "train": 96,
+            "validation": 30
+          },
+          "test_positive_sender_ids": 95,
+          "test_positive_sender_ids_also_positive_in_train_or_validation": 13,
+          "broadcasts_observed_in_multiple_record_files": 39723,
+          "raw_record_copies_after_unique_broadcast_deduplication": 78065,
+          "receive_time_ns_min_max": [
+            3601262160543,
+            14399811996805
+          ],
+          "receive_time_unit": "nanoseconds, simulator time (not UTC wall-clock time)",
+          "sender_position_m_ranges": [
+            [
+              216148.97476425322,
+              216797.9402288795
+            ],
+            [
+              449728.3244924409,
+              454215.26915264525
+            ],
+            [
+              0.0,
+              0.0
+            ]
+          ],
+          "one_second_slices": 12519,
+          "multi_vehicle_one_second_slices": 12485,
+          "multi_vehicle_slices_with_attacker_labels": 6675,
+          "max_attacker_emitters_in_one_second_slice": 4
+        }
+      },
+      "official_split_note": "Train, validation, and test are the official paths inside each published archive. Their raw simulator-time ranges and sender-ID overlap are recorded per archive; no overlapping random test subsamples are treated as independent corridor-days.",
+      "receive_observation_note": "The raw files repeat a sender/messageID/sendTime broadcast across receiver files. Trajectory parsing keeps the earliest receive observation per broadcast and preserves its integer nanosecond time.",
+      "documentation_url": "https://github.com/VeReMi-dataset/VeReMi-NextGen/blob/main/Documentation/README.md",
+      "metrics": {
+        "detection": {
+          "status": "EVALUABLE",
+          "reason": "Published attacker==0/1 labels are present on official train, validation, and test BSM records. Conclusions are limited to simulated misbehavior detection, not field cyber incidents.",
+          "ground_truth_source": "VeReMi NextGen record field attacker",
+          "observation_unit": "labeled BSM record / causal per-vehicle window"
+        },
+        "emitter_or_node_localization": {
+          "status": "EVALUABLE",
+          "reason": "Published attacker labels identify sender_id, and audited one-second slices contain multiple vehicles. This supports attacker-emitter localization only, not causal corridor-node localization.",
+          "ground_truth_source": "VeReMi NextGen record fields attacker and sender_id",
+          "observation_unit": "multi-vehicle one-second simulator-time slice"
+        },
+        "causal_rca": {
+          "status": "NOT_EVALUABLE",
+          "reason": "The archive labels malicious messages and senders, but provides no independent corridor-disruption outcome or causal root-node annotations.",
+          "ground_truth_source": null,
+          "observation_unit": "causal incident episode with independently labeled origin"
+        },
+        "mttd": {
+          "status": "EVALUABLE",
+          "reason": "A narrowly scoped simulated attack-message detection latency can use attacker-label 0-to-1 transitions within the official test timeline as episode onsets. It is not field incident MTTD and requires explicit handling of attacks already active before test.",
+          "ground_truth_source": "VeReMi NextGen attacker labels and rcvTime",
+          "observation_unit": "per-emitter labeled BSM episode; seconds of simulator time"
+        },
+        "work_zone_far": {
+          "status": "NOT_EVALUABLE",
+          "reason": "VeReMi has no work-zone exposure labels or synchronized operational traffic observations.",
+          "ground_truth_source": null,
+          "observation_unit": "work-zone exposure window"
+        },
+        "cross_modal_fusion": {
+          "status": "NOT_EVALUABLE",
+          "reason": "The acquired VeReMi subset contains BSM records only, without aligned controller, detector, SPaT, or operator-log streams.",
+          "ground_truth_source": null,
+          "observation_unit": "synchronized multimodal event window"
+        }
+      }
+    },
+    "pems_bay": {
+      "dataset_name": "PeMS-BAY District 4",
+      "dataset_version": "single source file for 2022-01-01",
+      "record_count": 707040,
+      "station_count": 2455,
+      "timestamp_min_max_utc": [
+        "2022-01-01T00:00:00+00:00",
+        "2022-01-01T23:55:00+00:00"
+      ],
+      "observed_source_columns": [
+        "timestamp",
+        "station",
+        "district",
+        "freeway",
+        "direction",
+        "lane_type",
+        "station_length",
+        "samples",
+        "observed_percentage",
+        "total_flow",
+        "avg_occupancy",
+        "avg_speed"
+      ],
+      "spatial_metadata": {
+        "station_ids": true,
+        "freeway_and_direction": true,
+        "station_coordinates": false,
+        "postmile_or_ordering_metadata": false,
+        "station_length_is_location_order": false
+      },
+      "observed_percentage_min_max": [
+        0.0,
+        0.0
+      ],
+      "ground_truth": "No incident, anomaly, detector-failure, or attack labels.",
+      "metrics": {
+        "detection": {
+          "status": "NOT_EVALUABLE",
+          "reason": "Detector measurements are real, but the acquired day has no verified incident, anomaly, or attack labels.",
+          "ground_truth_source": null,
+          "observation_unit": "station five-minute interval"
+        },
+        "emitter_or_node_localization": {
+          "status": "NOT_EVALUABLE",
+          "reason": "Station IDs identify measurement sources, but no ground-truth anomalous station or origin labels are present.",
+          "ground_truth_source": null,
+          "observation_unit": "station five-minute interval"
+        },
+        "causal_rca": {
+          "status": "NOT_EVALUABLE",
+          "reason": "No independent ground-truth labels for this metric in the acquired records.",
+          "ground_truth_source": null,
+          "observation_unit": "station five-minute interval"
+        },
+        "mttd": {
+          "status": "NOT_EVALUABLE",
+          "reason": "No labeled event onset or detector alarm outcome is available.",
+          "ground_truth_source": null,
+          "observation_unit": "station five-minute interval"
+        },
+        "work_zone_far": {
+          "status": "NOT_EVALUABLE",
+          "reason": "The detector file covers 2022-01-01 and does not overlap the 2026 Caltrans closure report.",
+          "ground_truth_source": null,
+          "observation_unit": "station five-minute interval"
+        },
+        "cross_modal_fusion": {
+          "status": "NOT_EVALUABLE",
+          "reason": "The acquired PeMS subset contains detector rows only and no synchronized BSM, SPaT, or controller-log records.",
+          "ground_truth_source": null,
+          "observation_unit": "station five-minute interval"
+        }
+      }
+    },
+    "tampa_cv": {
+      "dataset_name": "USDOT Tampa CV Pilot BSM and SPaT sample records",
+      "dataset_version": "1,000 records per acquired public resource",
+      "bsm_record_count": 1000,
+      "bsm_time_min_max_utc_assumed": [
+        "2021-03-19T00:17:15.784000+00:00",
+        "2021-03-19T00:19:33.071000+00:00"
+      ],
+      "bsm_source_ids": [
+        "thea1",
+        "thea2",
+        "thea24",
+        "thea25",
+        "thea30",
+        "thea31",
+        "thea42"
+      ],
+      "bsm_records_with_lat_lon": 1000,
+      "spat_record_count": 1000,
+      "spat_time_min_max_utc_assumed": [
+        "2021-03-16T00:00:00+00:00",
+        "2021-03-16T00:00:37+00:00"
+      ],
+      "spat_source_ids": [
+        "thea22",
+        "thea40",
+        "thea5"
+      ],
+      "spat_records_with_intersections": 1000,
+      "bsm_spat_time_ranges_overlap": false,
+      "source_timestamp_note": "The acquired timestamp strings omit timezone offsets; UTC is the existing parser convention. The BSM and SPaT samples are separated by three days.",
+      "metrics": {
+        "detection": {
+          "status": "NOT_EVALUABLE",
+          "reason": "No independently labeled attack or anomaly records are present.",
+          "ground_truth_source": null,
+          "observation_unit": "individual BSM or SPaT record"
+        },
+        "emitter_or_node_localization": {
+          "status": "NOT_EVALUABLE",
+          "reason": "RSU IDs and BSM positions exist, but no anomalous-emitter ground truth is provided.",
+          "ground_truth_source": null,
+          "observation_unit": "individual BSM or SPaT record"
+        },
+        "causal_rca": {
+          "status": "NOT_EVALUABLE",
+          "reason": "No independent ground-truth labels for this metric in the acquired records.",
+          "ground_truth_source": null,
+          "observation_unit": "individual BSM or SPaT record"
+        },
+        "mttd": {
+          "status": "NOT_EVALUABLE",
+          "reason": "No attack onset or detection outcome labels are present.",
+          "ground_truth_source": null,
+          "observation_unit": "individual BSM or SPaT record"
+        },
+        "work_zone_far": {
+          "status": "NOT_EVALUABLE",
+          "reason": "No work-zone labels or aligned closure data are present.",
+          "ground_truth_source": null,
+          "observation_unit": "individual BSM or SPaT record"
+        },
+        "cross_modal_fusion": {
+          "status": "NOT_EVALUABLE",
+          "reason": "The 1,000 BSM samples are from 2021-03-19, while the 1,000 SPaT samples are from 2021-03-16; their acquired time ranges do not overlap.",
+          "ground_truth_source": null,
+          "observation_unit": "individual BSM or SPaT record"
+        }
+      }
+    },
+    "caltrans_lcs": {
+      "dataset_name": "Caltrans District 4 Alameda US-80 Planned Lane Closures",
+      "record_count": 3,
+      "planned_start_times_utc": [
+        "2026-11-20T15:30:00+00:00",
+        "2026-11-25T08:01:00+00:00",
+        "2026-11-25T08:01:00+00:00"
+      ],
+      "observed_traffic_during_closures": false,
+      "ground_truth": "Planned closure text only; no matched detector/BSM windows.",
+      "metrics": {
+        "detection": {
+          "status": "NOT_EVALUABLE",
+          "reason": "Planned closure records are not sensor anomaly labels.",
+          "ground_truth_source": null,
+          "observation_unit": "planned lane-closure record"
+        },
+        "emitter_or_node_localization": {
+          "status": "NOT_EVALUABLE",
+          "reason": "No aligned operational telemetry and ground truth for this metric.",
+          "ground_truth_source": null,
+          "observation_unit": "planned lane-closure record"
+        },
+        "causal_rca": {
+          "status": "NOT_EVALUABLE",
+          "reason": "No aligned operational telemetry and ground truth for this metric.",
+          "ground_truth_source": null,
+          "observation_unit": "planned lane-closure record"
+        },
+        "mttd": {
+          "status": "NOT_EVALUABLE",
+          "reason": "No measured telemetry or detector alarm outcomes accompany the plans.",
+          "ground_truth_source": null,
+          "observation_unit": "planned lane-closure record"
+        },
+        "work_zone_far": {
+          "status": "NOT_EVALUABLE",
+          "reason": "Planned closure windows exist, but no aligned traffic observations are available for measuring false alarms.",
+          "ground_truth_source": null,
+          "observation_unit": "planned lane-closure record"
+        },
+        "cross_modal_fusion": {
+          "status": "NOT_EVALUABLE",
+          "reason": "No aligned operational telemetry and ground truth for this metric.",
+          "ground_truth_source": null,
+          "observation_unit": "planned lane-closure record"
+        }
+      }
+    },
+    "cisa_kev": {
+      "dataset_name": "CISA Known Exploited Vulnerabilities catalog",
+      "catalog_version": "2026.11.25",
+      "record_count": 1805,
+      "date_added_min_max": [
+        "2021-11-03",
+        "2026-11-25"
+      ],
+      "observation_unit": "vulnerability knowledge record, not corridor telemetry",
+      "metrics": {
+        "detection": {
+          "status": "NOT_EVALUABLE",
+          "reason": "Threat-intelligence knowledge records are not corridor telemetry or labeled operational events.",
+          "ground_truth_source": null,
+          "observation_unit": "threat-intelligence record"
+        },
+        "emitter_or_node_localization": {
+          "status": "NOT_EVALUABLE",
+          "reason": "Threat-intelligence knowledge records are not corridor telemetry or labeled operational events.",
+          "ground_truth_source": null,
+          "observation_unit": "threat-intelligence record"
+        },
+        "causal_rca": {
+          "status": "NOT_EVALUABLE",
+          "reason": "Threat-intelligence knowledge records are not corridor telemetry or labeled operational events.",
+          "ground_truth_source": null,
+          "observation_unit": "threat-intelligence record"
+        },
+        "mttd": {
+          "status": "NOT_EVALUABLE",
+          "reason": "Threat-intelligence knowledge records are not corridor telemetry or labeled operational events.",
+          "ground_truth_source": null,
+          "observation_unit": "threat-intelligence record"
+        },
+        "work_zone_far": {
+          "status": "NOT_EVALUABLE",
+          "reason": "Threat-intelligence knowledge records are not corridor telemetry or labeled operational events.",
+          "ground_truth_source": null,
+          "observation_unit": "threat-intelligence record"
+        },
+        "cross_modal_fusion": {
+          "status": "NOT_EVALUABLE",
+          "reason": "Threat-intelligence knowledge records are not corridor telemetry or labeled operational events.",
+          "ground_truth_source": null,
+          "observation_unit": "threat-intelligence record"
+        }
+      }
+    },
+    "mitre_ics": {
+      "dataset_name": "MITRE ATT&CK for ICS STIX",
+      "record_count": 2570,
+      "object_type_counts": {
+        "attack-pattern": 127,
+        "campaign": 11,
+        "course-of-action": 53,
+        "identity": 1,
+        "intrusion-set": 16,
+        "malware": 32,
+        "marking-definition": 1,
+        "relationship": 1832,
+        "x-mitre-analytic": 302,
+        "x-mitre-asset": 18,
+        "x-mitre-collection": 1,
+        "x-mitre-data-component": 40,
+        "x-mitre-data-source": 17,
+        "x-mitre-detection-strategy": 106,
+        "x-mitre-matrix": 1,
+        "x-mitre-tactic": 12
+      },
+      "observation_unit": "threat-intelligence STIX object, not corridor telemetry",
+      "metrics": {
+        "detection": {
+          "status": "NOT_EVALUABLE",
+          "reason": "Threat-intelligence knowledge records are not corridor telemetry or labeled operational events.",
+          "ground_truth_source": null,
+          "observation_unit": "threat-intelligence record"
+        },
+        "emitter_or_node_localization": {
+          "status": "NOT_EVALUABLE",
+          "reason": "Threat-intelligence knowledge records are not corridor telemetry or labeled operational events.",
+          "ground_truth_source": null,
+          "observation_unit": "threat-intelligence record"
+        },
+        "causal_rca": {
+          "status": "NOT_EVALUABLE",
+          "reason": "Threat-intelligence knowledge records are not corridor telemetry or labeled operational events.",
+          "ground_truth_source": null,
+          "observation_unit": "threat-intelligence record"
+        },
+        "mttd": {
+          "status": "NOT_EVALUABLE",
+          "reason": "Threat-intelligence knowledge records are not corridor telemetry or labeled operational events.",
+          "ground_truth_source": null,
+          "observation_unit": "threat-intelligence record"
+        },
+        "work_zone_far": {
+          "status": "NOT_EVALUABLE",
+          "reason": "Threat-intelligence knowledge records are not corridor telemetry or labeled operational events.",
+          "ground_truth_source": null,
+          "observation_unit": "threat-intelligence record"
+        },
+        "cross_modal_fusion": {
+          "status": "NOT_EVALUABLE",
+          "reason": "Threat-intelligence knowledge records are not corridor telemetry or labeled operational events.",
+          "ground_truth_source": null,
+          "observation_unit": "threat-intelligence record"
+        }
+      }
+    }
+  },
+  "track_gate": {
+    "track_a1_veremi_detection_and_emitter_localization": {
+      "status": "EVALUABLE",
+      "allowed_claim": "Simulated VeReMi misbehavior detection and attacker-emitter localization using published message labels.",
+      "prohibited_claim": "Causal corridor root-cause identification or field-incident performance.",
+      "holdout_eligibility": {
+        "official_time_splits": {
+          "status": "EVALUABLE",
+          "sender_id_overlap_by_archive": {
+            "InTAS_highway_2_dataReplay.zip": 180,
+            "InTAS_highway_2_dosAttack.zip": 180
+          }
+        },
+        "attack_type_holdout": {
+          "status": "EVALUABLE",
+          "available_categories": [
+            "dataReplay",
+            "dosAttack"
+          ],
+          "note": "Only the acquired dataReplay and dosAttack subsets are available for cross-category holdout."
+        },
+        "independent_scenario_holdout": {
+          "status": "NOT_EVALUABLE",
+          "reason": "Both acquired attack subsets are InTAS_highway_2; no second independent corridor scenario is present."
+        }
+      }
+    },
+    "track_a2_pems_bay_labeled_anomaly_evaluation": {
+      "status": "NOT_EVALUABLE",
+      "reason": "No anomaly ground truth and no documented station coordinates or freeway ordering are present in the acquired source file."
+    },
+    "track_b_cross_dataset_contextual_evaluation": {
+      "status": "NOT_EVALUABLE",
+      "reason": "PeMS is from 2022-01-01, Caltrans closures are from 2026-11, and the Tampa BSM/SPaT sample ranges do not overlap. VeReMi is a separate simulator scenario."
+    }
+  },
+  "limitations": [
+    "VeReMi is simulated V2X misbehavior data, not field cyber-incident telemetry.",
+    "Attacker-emitter localization is not causal root-cause identification.",
+    "The current PeMS source file has observed_percentage equal to zero throughout; this value is not interpreted as a verified failure label.",
+    "Tampa timestamp strings omit timezone offsets; existing parser behavior assumes UTC.",
+    "The current evidence does not support work-zone FAR, causal RCA, or cross-dataset fusion."
+  ]
+}

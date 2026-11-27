@@ -13,8 +13,8 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: python -m pip install -e ".[dev,figures]"
+      - run: python -m pip install -e ".[dev,figures,torch]"
       - run: ruff check .
       - run: pytest
       - run: corridor-ingest --tampa-limit 10
-      - run: corridor-benchmark --seeds 2 --bootstrap-samples 50
+      - run: corridor-benchmark --seeds 2 --bootstrap-samples 50 --epochs 1

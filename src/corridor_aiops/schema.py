@@ -28,6 +28,8 @@ class CorridorEvent(BaseModel):
     message: str = ""
     label: str | None = None
     root_cause_id: str | None = None
+    broadcast_id: str | None = None
+    receive_time_ns: int | None = Field(default=None, ge=0)
 
     @field_validator("timestamp")
     @classmethod

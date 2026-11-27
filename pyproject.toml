@@ -19,12 +19,14 @@ dependencies = [
 
 [project.optional-dependencies]
 figures = ["matplotlib>=3.8,<4"]
+torch = ["torch>=2.3"]
 ml = ["torch>=2.3", "transformers>=4.44,<5", "shap>=0.46"]
 dev = ["pytest>=8.2", "ruff>=0.6"]
 all = ["matplotlib>=3.8,<4", "torch>=2.3", "transformers>=4.44,<5", "shap>=0.46", "pytest>=8.2", "ruff>=0.6"]
 
 [project.scripts]
 corridor-ingest = "corridor_aiops.data.download:main"
+corridor-audit = "corridor_aiops.data.audit:main"
 corridor-benchmark = "corridor_aiops.evaluation.benchmark:main"
 corridor-figures = "corridor_aiops.evaluation.figures:main"
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import gzip
 import io
 import json
+import math
 import zipfile
 from collections.abc import Iterator
 from datetime import datetime, timezone
@@ -85,9 +86,19 @@ def _dataset_split(path: str, inherited: str | None) -> str | None:
     return inherited
 
 
+def _finite_metric(value: Any) -> tuple[float, float]:
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return 0.0, 0.0
+    if not math.isfinite(number):
+        return 0.0, 0.0
+    return number, 1.0
+
+
 def _iter_veremi_archive(
     payload: bytes, inherited_split: str | None = None
-) -> Iterator[tuple[str, dict[str, Any]]]:
+) -> Iterator[tuple[str, str, int, dict[str, Any]]]:
     try:
         archive = zipfile.ZipFile(io.BytesIO(payload))
     except zipfile.BadZipFile as error:
@@ -105,20 +116,25 @@ def _iter_veremi_archive(
                     raise ValueError(
                         f"VeReMi record has no official split in archive path: {member}"
                     )
-                for record in _records_from_json(content):
-                    yield split, record
+                record_file_id = member.replace("\\", "/").rsplit("/", 1)[-1].rsplit(
+                    ".", 1
+                )[0]
+                for record_index, record in enumerate(_records_from_json(content)):
+                    yield split, record_file_id, record_index, record
 
 
 def veremi_events(path: Path) -> Iterator[CorridorEvent]:
-    """Read published VeReMi traces without altering records or labels."""
-    for split, record in _iter_veremi_archive(path.read_bytes()):
+    """Read one earliest receive observation for each published BSM broadcast."""
+    events: dict[tuple[str, str, str], CorridorEvent] = {}
+    for split, record_file_id, record_index, record in _iter_veremi_archive(
+        path.read_bytes()
+    ):
         if "attacker" not in record or record["attacker"] not in (0, 1, "0", "1"):
             raise ValueError("VeReMi record is missing the official attacker label")
         try:
-            receive_time = float(record["rcvTime"])
-            unit = "ns" if abs(receive_time) >= 1e12 else "s"
+            receive_time_ns = int(record["rcvTime"])
             timestamp = datetime.fromtimestamp(
-                receive_time / (1e9 if unit == "ns" else 1.0),
+                receive_time_ns / 1e9,
                 tz=timezone.utc,
             )
         except (KeyError, TypeError, ValueError, OverflowError) as error:
@@ -133,24 +149,38 @@ def veremi_events(path: Path) -> Iterator[CorridorEvent]:
                 position = position.split(",")
         if not isinstance(position, list):
             position = []
-        features = {
-            "speed": sender.get("spd", 0.0),
-            "acceleration": sender.get("acl", 0.0),
-            "heading": sender.get("hed", 0.0),
-            "position_x": position[0] if len(position) > 0 else 0.0,
-            "position_y": position[1] if len(position) > 1 else 0.0,
-            "position_z": position[2] if len(position) > 2 else 0.0,
+        speed, speed_valid = _finite_metric(sender.get("spd"))
+        acceleration, acceleration_valid = _finite_metric(sender.get("acl"))
+        heading, heading_valid = _finite_metric(sender.get("hed"))
+        coordinates = [
+            _finite_metric(position[axis]) if len(position) > axis else (0.0, 0.0)
+            for axis in range(3)
+        ]
+        metrics = {
+            "speed": speed,
+            "speed_valid": speed_valid,
+            "acceleration": acceleration,
+            "acceleration_valid": acceleration_valid,
+            "heading": heading,
+            "heading_valid": heading_valid,
+            "position_x": coordinates[0][0],
+            "position_y": coordinates[1][0],
+            "position_z": coordinates[2][0],
+            "position_xy_valid": coordinates[0][1] * coordinates[1][1],
+            "position_z_valid": coordinates[2][1],
         }
-        try:
-            metrics = {name: float(value) for name, value in features.items()}
-        except (TypeError, ValueError) as error:
-            raise ValueError("VeReMi record contains non-numeric sender telemetry") from error
         sender_id = str(record.get("sender_id", "unknown"))
         message_id = str(record.get("messageID", record.get("message_id", "")))
-        yield CorridorEvent(
+        send_time = record.get("sendTime")
+        broadcast_id = (
+            f"{sender_id}:{message_id}:{send_time}"
+            if send_time is not None and message_id
+            else None
+        )
+        event = CorridorEvent(
             event_id=(
                 f"veremi-{path.stem}-{split}-{sender_id}-"
-                f"{message_id}-{timestamp.timestamp()}"
+                f"{message_id}-{receive_time_ns}-{record_file_id}-{record_index}"
             ),
             timestamp=timestamp,
             corridor_id=f"{path.stem}-{split}",
@@ -158,7 +188,29 @@ def veremi_events(path: Path) -> Iterator[CorridorEvent]:
             kind=EventKind.BSM,
             metrics=metrics,
             label="cyber" if int(record["attacker"]) == 1 else "benign",
+            broadcast_id=broadcast_id,
+            receive_time_ns=receive_time_ns,
         )
+        key = (event.corridor_id, event.source_id, broadcast_id or event.event_id)
+        previous = events.get(key)
+        if previous is not None and previous.label != event.label:
+            raise ValueError(f"Conflicting labels for VeReMi broadcast {broadcast_id}")
+        if previous is None or (
+            event.receive_time_ns is not None
+            and previous.receive_time_ns is not None
+            and event.receive_time_ns < previous.receive_time_ns
+        ):
+            events[key] = event
+
+    yield from sorted(
+        events.values(),
+        key=lambda event: (
+            event.corridor_id,
+            event.receive_time_ns if event.receive_time_ns is not None else 0,
+            event.source_id,
+            event.event_id,
+        ),
+    )
 
 
 def _load_records(path: Path) -> list[dict[str, Any]]:

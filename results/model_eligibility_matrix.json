@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "evidence_source": "results/dataset_capability_matrix.json",
+  "dataset_capability_matrix_sha256": "990c14d2c6e2f917743bab91b80c7e7732aca3abc98f90b5bf99983f75542389",
+  "scope": "Eligibility reflects available labels and input modalities only. It does not imply that a model is trained, benchmarked, or validated.",
+  "models": [
+    {
+      "name": "isolation_forest",
+      "implementation_status": "implemented_baseline",
+      "input": "causal_trajectory_features",
+      "inputs_available_in_veremi": true,
+      "emitter_scoring": "aggregate_event_anomaly_scores_by_sender",
+      "training_status": "fit_on_official_benign_training_split",
+      "evaluation_status": "evaluated_on_official_veremi_splits",
+      "data_task_eligibility": {
+        "track_a1_detection": "DATA_ELIGIBLE",
+        "track_a1_attacker_emitter_localization": "DATA_ELIGIBLE",
+        "track_a1_simulated_message_latency": "DATA_ELIGIBLE",
+        "track_a2_labeled_anomaly_detection": "NOT_EVALUABLE",
+        "track_b_cross_modal_fusion": "NOT_EVALUABLE",
+        "causal_root_cause_localization": "NOT_EVALUABLE",
+        "work_zone_false_alarm_rate": "NOT_EVALUABLE"
+      },
+      "evaluation_reference": "results/benchmark_summary.json"
+    },
+    {
+      "name": "one_class_svm",
+      "implementation_status": "implemented_baseline",
+      "input": "causal_trajectory_features",
+      "inputs_available_in_veremi": true,
+      "emitter_scoring": "aggregate_event_anomaly_scores_by_sender",
+      "training_status": "fit_on_official_benign_training_split",
+      "evaluation_status": "evaluated_on_official_veremi_splits",
+      "data_task_eligibility": {
+        "track_a1_detection": "DATA_ELIGIBLE",
+        "track_a1_attacker_emitter_localization": "DATA_ELIGIBLE",
+        "track_a1_simulated_message_latency": "DATA_ELIGIBLE",
+        "track_a2_labeled_anomaly_detection": "NOT_EVALUABLE",
+        "track_b_cross_modal_fusion": "NOT_EVALUABLE",
+        "causal_root_cause_localization": "NOT_EVALUABLE",
+        "work_zone_false_alarm_rate": "NOT_EVALUABLE"
+      },
+      "evaluation_reference": "results/benchmark_summary.json"
+    },
+    {
+      "name": "robust_threshold_rules",
+      "implementation_status": "implemented_baseline",
+      "input": "causal_trajectory_features",
+      "inputs_available_in_veremi": true,
+      "emitter_scoring": "aggregate_event_anomaly_scores_by_sender",
+      "training_status": "fixed_rule_scored",
+      "evaluation_status": "evaluated_on_official_veremi_splits",
+      "data_task_eligibility": {
+        "track_a1_detection": "DATA_ELIGIBLE",
+        "track_a1_attacker_emitter_localization": "DATA_ELIGIBLE",
+        "track_a1_simulated_message_latency": "DATA_ELIGIBLE",
+        "track_a2_labeled_anomaly_detection": "NOT_EVALUABLE",
+        "track_b_cross_modal_fusion": "NOT_EVALUABLE",
+        "causal_root_cause_localization": "NOT_EVALUABLE",
+        "work_zone_false_alarm_rate": "NOT_EVALUABLE"
+      },
+      "evaluation_reference": "results/benchmark_summary.json"
+    },
+    {
+      "name": "lstm_autoencoder",
+      "implementation_status": "trained_sequence_baseline",
+      "input": "causal_trajectory_sequences",
+      "inputs_available_in_veremi": true,
+      "emitter_scoring": "aggregate_event_anomaly_scores_by_sender",
+      "training_status": "trained_on_non_malicious_official_training_sequences",
+      "evaluation_status": "evaluated_on_official_veremi_splits",
+      "data_task_eligibility": {
+        "track_a1_detection": "DATA_ELIGIBLE",
+        "track_a1_attacker_emitter_localization": "DATA_ELIGIBLE",
+        "track_a1_simulated_message_latency": "DATA_ELIGIBLE",
+        "track_a2_labeled_anomaly_detection": "NOT_EVALUABLE",
+        "track_b_cross_modal_fusion": "NOT_EVALUABLE",
+        "causal_root_cause_localization": "NOT_EVALUABLE",
+        "work_zone_false_alarm_rate": "NOT_EVALUABLE"
+      },
+      "evaluation_reference": "results/benchmark_summary.json"
+    },
+    {
+      "name": "tabular_transformer",
+      "implementation_status": "trained_sequence_baseline",
+      "input": "causal_trajectory_sequences",
+      "inputs_available_in_veremi": true,
+      "emitter_scoring": "aggregate_event_anomaly_scores_by_sender",
+      "training_status": "supervised_on_official_training_labels",
+      "evaluation_status": "evaluated_on_official_veremi_splits",
+      "data_task_eligibility": {
+        "track_a1_detection": "DATA_ELIGIBLE",
+        "track_a1_attacker_emitter_localization": "DATA_ELIGIBLE",
+        "track_a1_simulated_message_latency": "DATA_ELIGIBLE",
+        "track_a2_labeled_anomaly_detection": "NOT_EVALUABLE",
+        "track_b_cross_modal_fusion": "NOT_EVALUABLE",
+        "causal_root_cause_localization": "NOT_EVALUABLE",
+        "work_zone_false_alarm_rate": "NOT_EVALUABLE"
+      },
+      "evaluation_reference": "results/benchmark_summary.json"
+    },
+    {
+      "name": "corridor_log_transformer",
+      "implementation_status": "architecture_only",
+      "input": "trajectory_sequences_and_controller_text_logs",
+      "inputs_available_in_veremi": false,
+      "emitter_scoring": "aggregate_event_anomaly_scores_by_sender",
+      "training_status": "not_trained",
+      "evaluation_status": "not_evaluated_under_track_a1_protocol",
+      "data_task_eligibility": {
+        "track_a1_detection": "NOT_EVALUABLE",
+        "track_a1_attacker_emitter_localization": "NOT_EVALUABLE",
+        "track_a1_simulated_message_latency": "NOT_EVALUABLE",
+        "track_a2_labeled_anomaly_detection": "NOT_EVALUABLE",
+        "track_b_cross_modal_fusion": "NOT_EVALUABLE",
+        "causal_root_cause_localization": "NOT_EVALUABLE",
+        "work_zone_false_alarm_rate": "NOT_EVALUABLE"
+      }
+    },
+    {
+      "name": "static_gcn",
+      "implementation_status": "architecture_only",
+      "input": "trajectory_features_and_dynamic_v2x_graph",
+      "inputs_available_in_veremi": true,
+      "emitter_scoring": "node_localization_head",
+      "training_status": "not_trained",
+      "evaluation_status": "not_evaluated_under_track_a1_protocol",
+      "data_task_eligibility": {
+        "track_a1_detection": "DATA_ELIGIBLE",
+        "track_a1_attacker_emitter_localization": "DATA_ELIGIBLE",
+        "track_a1_simulated_message_latency": "DATA_ELIGIBLE",
+        "track_a2_labeled_anomaly_detection": "NOT_EVALUABLE",
+        "track_b_cross_modal_fusion": "NOT_EVALUABLE",
+        "causal_root_cause_localization": "NOT_EVALUABLE",
+        "work_zone_false_alarm_rate": "NOT_EVALUABLE"
+      }
+    },
+    {
+      "name": "async_st_gnn",
+      "implementation_status": "architecture_only",
+      "input": "causal_trajectory_sequences_and_dynamic_v2x_graph",
+      "inputs_available_in_veremi": true,
+      "emitter_scoring": "node_localization_head",
+      "training_status": "not_trained",
+      "evaluation_status": "not_evaluated_under_track_a1_protocol",
+      "data_task_eligibility": {
+        "track_a1_detection": "DATA_ELIGIBLE",
+        "track_a1_attacker_emitter_localization": "DATA_ELIGIBLE",
+        "track_a1_simulated_message_latency": "DATA_ELIGIBLE",
+        "track_a2_labeled_anomaly_detection": "NOT_EVALUABLE",
+        "track_b_cross_modal_fusion": "NOT_EVALUABLE",
+        "causal_root_cause_localization": "NOT_EVALUABLE",
+        "work_zone_false_alarm_rate": "NOT_EVALUABLE"
+      }
+    }
+  ],
+  "task_notes": {
+    "track_a1_detection": "Simulated VeReMi misbehavior detection using official attacker labels.",
+    "track_a1_attacker_emitter_localization": "Emitter identification from per-message labels and sender IDs; this is not causal corridor root-cause localization.",
+    "track_a1_simulated_message_latency": "Only latency from a labeled simulator attacker transition is eligible; it is not field-incident MTTD.",
+    "causal_root_cause_localization": "Not evaluable without causal ground-truth root-cause identifiers.",
+    "work_zone_false_alarm_rate": "Not evaluable without time-aligned work-zone and traffic observations.",
+    "track_b_cross_modal_fusion": "Not evaluable without temporally and spatially aligned modalities."
+  },
+  "benchmark_summary_sha256": "5fbfb3db407033fb2acde6998f5cda8b6ac8c9e3908719a87ae4905349a30604"
+}

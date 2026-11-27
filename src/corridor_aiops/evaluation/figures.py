@@ -11,7 +11,14 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-COLORS = ["crimson", "royalblue", "mediumpurple", "lightseagreen"]
+COLORS = ["crimson", "royalblue", "mediumpurple", "lightseagreen", "darkorange"]
+DISPLAY_NAMES = {
+    "isolation_forest": "Isolation forest",
+    "one_class_svm": "One-class SVM",
+    "robust_threshold_rules": "Rules",
+    "lstm_autoencoder": "LSTM autoencoder",
+    "tabular_transformer": "Tabular Transformer",
+}
 
 
 def _style() -> None:
@@ -45,7 +52,7 @@ def generate_figures(
         "Published data\nVeReMi | USDOT\nPeMS | Caltrans",
         "Parse and validate\nPydantic event schema",
         "Replay adapters\nVissim | SUMO\nCARLA / ROS 2",
-        "Anomaly scoring\n3 implemented baselines",
+        "Anomaly scoring\n5 evaluated models",
         "Human review\nNo automated control",
     ]
     positions = [0.02, 0.22, 0.42, 0.62, 0.82]
@@ -92,9 +99,20 @@ def generate_figures(
     for index, (name, model) in enumerate(summary["models"].items()):
         color = COLORS[index % len(COLORS)]
         roc = model["roc"]
-        axes[0].plot(roc["fpr"], roc["tpr"], label=f"{name} ({model['auroc']:.2f})", color=color)
+        display_name = DISPLAY_NAMES.get(name, name.replace("_", " "))
+        axes[0].plot(
+            roc["fpr"],
+            roc["tpr"],
+            label=f"{display_name} ({model['auroc']:.2f})",
+            color=color,
+        )
         pr = model["precision_recall"]
-        axes[1].plot(pr["recall"], pr["precision"], label=name, color=color)
+        axes[1].plot(
+            pr["recall"],
+            pr["precision"],
+            label=display_name,
+            color=color,
+        )
     axes[0].plot([0, 1], [0, 1], linestyle="--", color="gray", linewidth=0.8)
     axes[0].set(xlabel="False-positive rate", ylabel="True-positive rate", title="ROC")
     axes[1].set(xlabel="Recall", ylabel="Precision", title="Precision-recall")
@@ -106,11 +124,14 @@ def generate_figures(
     with (results_dir / "seed_metrics.csv").open(encoding="utf-8") as stream:
         rows = list(csv.DictReader(stream))
     models = list(summary["models"])
-    fig, axes = plt.subplots(1, 2, figsize=(8, 3.3))
+    fig, axes = plt.subplots(1, 2, figsize=(9, 3.5))
     for axis, metric, title in zip(
         axes,
-        ("false_alarm_rate_benign", "f1_cyber_vs_benign"),
-        ("False alarm rate on non-malicious VeReMi records", "Cyber/misbehavior F1"),
+        ("false_alarm_rate_non_malicious", "f1_cyber_vs_benign"),
+        (
+            "False alarm rate on non-malicious VeReMi records",
+            "Cyber/misbehavior F1",
+        ),
         strict=True,
     ):
         grouped = [
@@ -121,7 +142,12 @@ def generate_figures(
             ]
             for model in models
         ]
-        axis.boxplot(grouped, showfliers=False, patch_artist=True)
+        boxplot = axis.boxplot(grouped, showfliers=False, patch_artist=True)
+        for box, color in zip(boxplot["boxes"], COLORS, strict=True):
+            box.set_facecolor(color)
+            box.set_alpha(0.25)
+        for median in boxplot["medians"]:
+            median.set_color("black")
         for index, values in enumerate(grouped):
             jitter = np.linspace(-0.07, 0.07, len(values))
             axis.scatter(
@@ -132,35 +158,45 @@ def generate_figures(
                 alpha=0.75,
                 zorder=3,
             )
-        axis.set_xticks(range(1, len(models) + 1), models)
+        axis.set_xticks(
+            range(1, len(models) + 1),
+            [DISPLAY_NAMES.get(model, model.replace("_", " ")) for model in models],
+        )
         axis.set_title(title)
         axis.set_ylabel("Rate")
-        axis.tick_params(axis="x", labelrotation=25, labelsize=7)
+        axis.tick_params(axis="x", labelrotation=20, labelsize=7)
         values = [value for group in grouped for value in group]
         padding = max((max(values) - min(values)) * 0.1, 0.01)
         axis.set_ylim(max(0, min(values) - padding), min(1.03, max(values) + padding))
     axes[0].text(
         0.5,
         -0.43,
-        "Work-zone FAR is unmeasured: current Caltrans closures do not align with VeReMi.",
+        "Sender-cluster bootstrap draws; work-zone FAR is not measured.",
         transform=axes[0].transAxes,
         ha="center",
         fontsize=7,
     )
     fig.tight_layout()
-    _save(fig, figure_dir / "fig3_workzone_false_alarms")
+    _save(fig, figure_dir / "fig3_false_alarm_uncertainty")
 
-    feature_differences = summary["standardized_feature_mean_difference"]
+    feature_differences = summary["standardized_feature_median_separation"]
     features = list(feature_differences)
-    attribution = np.asarray([list(feature_differences.values())], dtype=float)
-    fig, ax = plt.subplots(figsize=(7, 2.8))
-    image = ax.imshow(attribution, cmap="Purples", aspect="auto")
-    ax.set_xticks(range(len(features)), features, rotation=20, ha="right")
-    ax.set_yticks([0], ["attacker vs. benign"])
-    ax.set_title("Standardized feature separation (not SHAP or causal evidence)")
-    fig.colorbar(image, ax=ax, label="absolute standardized mean difference")
+    separation = np.asarray(
+        [[value if value is not None else 0.0 for value in feature_differences.values()]],
+        dtype=float,
+    )
+    attribution = np.log10(1.0 + separation)
+    values = attribution[0]
+    fig, ax = plt.subplots(figsize=(7, 4.2))
+    positions = np.arange(len(features))
+    ax.barh(positions, values, color=COLORS[2])
+    ax.set_yticks(positions, features)
+    ax.invert_yaxis()
+    ax.set_xlabel("log10(1 + absolute median difference / robust scale)")
+    ax.set_title("Observed median feature separation, not SHAP or causal evidence")
+    ax.grid(axis="x", alpha=0.2)
     fig.tight_layout()
-    _save(fig, figure_dir / "fig4_shap_causal_attribution")
+    _save(fig, figure_dir / "fig4_feature_separation")
 
 
 def main() -> None:
