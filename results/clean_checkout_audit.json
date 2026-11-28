@@ -1,8 +1,8 @@
 {
   "generated_at_utc": "2026-11-28T03:06:25.912632+00:00",
   "procedure": "git clone of the committed repository into a temporary directory; official-split benchmark rerun from the clone (PYTHONPATH set to the clone's src); per-seed headline metrics compared with the committed results; ruff and pytest run on Linux (WSL) from a separate clone of the same commit",
-  "commit": "822b3ec7780731cae38156e169d72305091a708d",
-  "linux_commit": "822b3ec7780731cae38156e169d72305091a708d",
+  "commit": "3b018b8e81639c53287db085f38db0071d883726",
+  "linux_commit": "3b018b8e81639c53287db085f38db0071d883726",
   "clone_dir": "temporary git clone (scratch directory, deleted after the audit)",
   "command": "PYTHONPATH=<clone>/src python -m corridor_aiops.evaluation.benchmark --train-seeds 5 --bootstrap-samples 1000 --bootstrap-preview-rows 20 --epochs 5 --skip-generalization --skip-ablations",
   "models": 9,
@@ -47,5 +47,6 @@
     }
   },
   "scope_note": "Covers the official-split headline comparison only; generalization and ablation contexts are covered by results/reproduction_audit.json. Not a bit-identical determinism claim.",
-  "code_difference_between_commits": "the audited commit 822b3ec is followed by one commit that records this audit; no source code changes between them (git diff 822b3ec -- src tests is empty); the later commit changes only this audit, its macros, the regenerated README block, and the rebuilt manuscript files"
+  "code_difference_between_commits": "the audited commit 3b018b8 is followed by two commits, one that records this audit and one that updates commit references after the history rewrite; no source code changes between them (git diff 3b018b8 -- src tests is empty); the later commits change only this audit, its macros, the dataset capability matrix commit reference, the regenerated README block, and the rebuilt manuscript files",
+  "history_rewrite_note": "the audit ran on commit 822b3ec; a later history rewrite removed a local file path from the document properties of paper/main.docx in earlier commits, which renamed 822b3ec to 3b018b8; the file tree of 3b018b8 is identical to that of 822b3ec, so the audited code and data are unchanged"
 }
