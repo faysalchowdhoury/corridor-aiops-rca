@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-11-27T21:27:49.565242+00:00",
+  "generated_at_utc": "2026-11-28T02:48:30.089761+00:00",
   "procedure": "independent second run of the full benchmark in a fresh Python process from the same raw data into results_repro_check/, then value-by-value comparison against results/",
   "command": [
     "python.exe",
@@ -18,200 +18,158 @@
     "--epochs",
     "5"
   ],
-  "second_run_wall_clock_seconds": 13566.0827698,
+  "second_run_wall_clock_seconds": 7320.5603986999995,
   "determinism_status": "NOT_BIT_IDENTICAL",
-  "numeric_values_compared": 58896,
-  "numeric_values_with_nonzero_delta": 41,
-  "max_abs_numeric_delta": 1.8427300818468773e-05,
+  "numeric_values_compared": 59121,
+  "numeric_values_with_nonzero_delta": 40,
+  "max_abs_numeric_delta": 9.21237162720967e-06,
   "nonzero_deltas": [
     {
       "file": "benchmark_summary.json",
-      "path": "generalization.chronological_holdout.models.random_forest.mean_std_across_training_seeds.validation_auroc.std",
-      "first": 0.00014062423319420424,
-      "second": 0.00014062423319424319,
-      "abs_delta": 3.8949963046541747e-17
-    },
-    {
-      "file": "benchmark_summary.json",
       "path": "generalization.chronological_holdout.models.random_forest.mean_std_across_training_seeds.validation_calibrated_threshold_at_far_5.0pct.std",
-      "first": 0.002045541525140674,
-      "second": 0.002045541525140693,
-      "abs_delta": 1.9081958235744878e-17
-    },
-    {
-      "file": "benchmark_summary.json",
-      "path": "generalization.chronological_holdout.models.random_forest.mean_std_across_training_seeds.validation_f1_threshold.mean",
-      "first": 0.4958455749486358,
-      "second": 0.4958455749486359,
-      "abs_delta": 1.1102230246251565e-16
-    },
-    {
-      "file": "benchmark_summary.json",
-      "path": "generalization.chronological_holdout.models.random_forest.mean_std_across_training_seeds.validation_f1_threshold.std",
-      "first": 0.012433096162678585,
-      "second": 0.012433096162678587,
-      "abs_delta": 1.734723475976807e-18
-    },
-    {
-      "file": "benchmark_summary.json",
-      "path": "generalization.chronological_holdout.models.random_forest.per_seed[0].validation_calibrated_threshold_at_far_5.0pct",
-      "first": 0.2652613007878167,
-      "second": 0.2652613007878166,
-      "abs_delta": 5.551115123125783e-17
-    },
-    {
-      "file": "benchmark_summary.json",
-      "path": "generalization.chronological_holdout.models.random_forest.per_seed[0].validation_f1_threshold",
-      "first": 0.4965886942107265,
-      "second": 0.49658869421072666,
-      "abs_delta": 1.6653345369377348e-16
+      "first": 0.0020455415251406893,
+      "second": 0.002045541525140674,
+      "abs_delta": 1.5178830414797062e-17
     },
     {
       "file": "benchmark_summary.json",
       "path": "generalization.chronological_holdout.models.random_forest.per_seed[1].validation_calibrated_threshold_at_far_5.0pct",
-      "first": 0.26642500138736674,
-      "second": 0.2664250013873668,
+      "first": 0.2664250013873668,
+      "second": 0.26642500138736674,
       "abs_delta": 5.551115123125783e-17
     },
     {
       "file": "benchmark_summary.json",
-      "path": "generalization.chronological_holdout.models.random_forest.per_seed[2].validation_auroc",
-      "first": 0.9957144149500993,
-      "second": 0.9957144149500994,
-      "abs_delta": 1.1102230246251565e-16
-    },
-    {
-      "file": "benchmark_summary.json",
       "path": "generalization.chronological_holdout.models.random_forest.per_seed[2].validation_calibrated_threshold_at_far_5.0pct",
-      "first": 0.26257682119054265,
-      "second": 0.2625768211905426,
+      "first": 0.2625768211905426,
+      "second": 0.26257682119054265,
       "abs_delta": 5.551115123125783e-17
     },
     {
       "file": "benchmark_summary.json",
       "path": "generalization.chronological_holdout.models.random_forest.per_seed[4].validation_calibrated_threshold_at_far_5.0pct",
-      "first": 0.2674493187329767,
-      "second": 0.26744931873297667,
+      "first": 0.26744931873297667,
+      "second": 0.2674493187329767,
       "abs_delta": 5.551115123125783e-17
-    },
-    {
-      "file": "benchmark_summary.json",
-      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.mean_std_across_training_seeds.auroc.std",
-      "first": 0.006922106970368673,
-      "second": 0.006922106970368708,
-      "abs_delta": 3.469446951953614e-17
     },
     {
       "file": "benchmark_summary.json",
       "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.mean_std_across_training_seeds.average_precision.mean",
-      "first": 0.6089065377457781,
-      "second": 0.6089065364871897,
-      "abs_delta": 1.2585883446547541e-09
+      "first": 0.6089065460127252,
+      "second": 0.6089065469167403,
+      "abs_delta": 9.040150850125883e-10
     },
     {
       "file": "benchmark_summary.json",
       "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.mean_std_across_training_seeds.average_precision.std",
-      "first": 0.008201115827062776,
-      "second": 0.008201113274113587,
-      "abs_delta": 2.5529491888554023e-09
+      "first": 0.008201120449814987,
+      "second": 0.008201128218434195,
+      "abs_delta": 7.768619207995653e-09
     },
     {
       "file": "benchmark_summary.json",
       "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.mean_std_across_training_seeds.validation_calibrated_threshold_at_far_1.0pct.std",
-      "first": 0.00879945831246266,
-      "second": 0.008799458312462684,
-      "abs_delta": 2.42861286636753e-17
+      "first": 0.008799458312462632,
+      "second": 0.00879945831246266,
+      "abs_delta": 2.7755575615628914e-17
     },
     {
       "file": "benchmark_summary.json",
-      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.mean_std_across_training_seeds.validation_f1_threshold.std",
-      "first": 0.028790218050283704,
-      "second": 0.028790218050283697,
-      "abs_delta": 6.938893903907228e-18
+      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.per_seed[0].average_precision",
+      "first": 0.6053665706700988,
+      "second": 0.6053665707109772,
+      "abs_delta": 4.0878411766698264e-11
     },
     {
       "file": "benchmark_summary.json",
-      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.per_seed[2].validation_f1_threshold",
-      "first": 0.4267234841433107,
-      "second": 0.42672348414331074,
-      "abs_delta": 5.551115123125783e-17
-    },
-    {
-      "file": "benchmark_summary.json",
-      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.per_seed[3].auroc",
-      "first": 0.8179618490569266,
-      "second": 0.8179618490569267,
-      "abs_delta": 1.1102230246251565e-16
+      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.per_seed[1].average_precision",
+      "first": 0.609711291541933,
+      "second": 0.6097112759159651,
+      "abs_delta": 1.5625967964005838e-08
     },
     {
       "file": "benchmark_summary.json",
       "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.per_seed[3].average_precision",
-      "first": 0.6222148005027974,
-      "second": 0.622214794209855,
-      "abs_delta": 6.292942389407585e-09
+      "first": 0.6222148160080734,
+      "second": 0.6222148361132382,
+      "abs_delta": 2.010516486627978e-08
     },
     {
       "file": "benchmark_summary.json",
-      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.per_seed[3].validation_calibrated_threshold_at_far_1.0pct",
-      "first": 0.6545874789970706,
-      "second": 0.6545874789970707,
+      "path": "generalization.leave_one_attack_type_out.dataReplay->dosAttack.models.random_forest.per_seed[4].validation_calibrated_threshold_at_far_1.0pct",
+      "first": 0.6556764965598303,
+      "second": 0.6556764965598304,
       "abs_delta": 1.1102230246251565e-16
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.leave_one_attack_type_out.dosAttack->dataReplay.models.random_forest.mean_std_across_training_seeds.auroc.mean",
+      "first": 0.5523089805840412,
+      "second": 0.5523089903482626,
+      "abs_delta": 9.764221431396436e-09
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.leave_one_attack_type_out.dosAttack->dataReplay.models.random_forest.mean_std_across_training_seeds.auroc.std",
+      "first": 0.01200949454301098,
+      "second": 0.012009486356315883,
+      "abs_delta": 8.186695097875396e-09
     },
     {
       "file": "benchmark_summary.json",
       "path": "generalization.leave_one_attack_type_out.dosAttack->dataReplay.models.random_forest.mean_std_across_training_seeds.validation_calibrated_threshold_at_far_1.0pct.std",
-      "first": 0.006736135339336831,
-      "second": 0.006736135339336835,
+      "first": 0.006736135339336826,
+      "second": 0.00673613533933683,
       "abs_delta": 4.336808689942018e-18
     },
     {
       "file": "benchmark_summary.json",
-      "path": "generalization.leave_one_attack_type_out.dosAttack->dataReplay.models.random_forest.mean_std_across_training_seeds.validation_f1_threshold.std",
-      "first": 0.02554620403179684,
-      "second": 0.025546204031796877,
-      "abs_delta": 3.8163916471489756e-17
+      "path": "generalization.leave_one_attack_type_out.dosAttack->dataReplay.models.random_forest.per_seed[2].validation_calibrated_threshold_at_far_1.0pct",
+      "first": 0.2298292441606421,
+      "second": 0.22982924416064207,
+      "abs_delta": 2.7755575615628914e-17
     },
     {
       "file": "benchmark_summary.json",
-      "path": "generalization.leave_one_attack_type_out.dosAttack->dataReplay.models.random_forest.per_seed[0].validation_f1_threshold",
-      "first": 0.6931035870778223,
-      "second": 0.6931035870778222,
+      "path": "generalization.leave_one_attack_type_out.dosAttack->dataReplay.models.random_forest.per_seed[3].auroc",
+      "first": 0.544253589718353,
+      "second": 0.5442536385394601,
+      "abs_delta": 4.882110704595988e-08
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.sender_disjoint_holdout.models.random_forest.mean_std_across_training_seeds.validation_calibrated_threshold_at_far_1.0pct.mean",
+      "first": 0.44476528877700083,
+      "second": 0.4447652887770007,
       "abs_delta": 1.1102230246251565e-16
     },
     {
       "file": "benchmark_summary.json",
-      "path": "generalization.leave_one_attack_type_out.dosAttack->dataReplay.models.random_forest.per_seed[2].validation_calibrated_threshold_at_far_1.0pct",
-      "first": 0.22982924416064207,
-      "second": 0.2298292441606421,
-      "abs_delta": 2.7755575615628914e-17
-    },
-    {
-      "file": "benchmark_summary.json",
-      "path": "generalization.leave_one_attack_type_out.dosAttack->dataReplay.models.random_forest.per_seed[4].validation_calibrated_threshold_at_far_1.0pct",
-      "first": 0.24318207930398053,
-      "second": 0.24318207930398056,
-      "abs_delta": 2.7755575615628914e-17
-    },
-    {
-      "file": "benchmark_summary.json",
       "path": "generalization.sender_disjoint_holdout.models.random_forest.mean_std_across_training_seeds.validation_calibrated_threshold_at_far_1.0pct.std",
-      "first": 0.0041855598509924225,
-      "second": 0.004185559850992409,
-      "abs_delta": 1.3877787807814457e-17
-    },
-    {
-      "file": "benchmark_summary.json",
-      "path": "generalization.sender_disjoint_holdout.models.random_forest.mean_std_across_training_seeds.validation_calibrated_threshold_at_far_5.0pct.mean",
-      "first": 0.21688489412474904,
-      "second": 0.21688489412474898,
-      "abs_delta": 5.551115123125783e-17
+      "first": 0.004185559850992429,
+      "second": 0.004185559850992417,
+      "abs_delta": 1.1275702593849246e-17
     },
     {
       "file": "benchmark_summary.json",
       "path": "generalization.sender_disjoint_holdout.models.random_forest.mean_std_across_training_seeds.validation_calibrated_threshold_at_far_5.0pct.std",
-      "first": 0.0030875705026020524,
+      "first": 0.0030875705026020576,
       "second": 0.0030875705026020615,
-      "abs_delta": 9.107298248878237e-18
+      "abs_delta": 3.903127820947816e-18
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.sender_disjoint_holdout.models.random_forest.mean_std_across_training_seeds.validation_f1_threshold.mean",
+      "first": 0.49460691024986003,
+      "second": 0.49460691024986014,
+      "abs_delta": 1.1102230246251565e-16
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.sender_disjoint_holdout.models.random_forest.mean_std_across_training_seeds.validation_f1_threshold.std",
+      "first": 0.010124829564539856,
+      "second": 0.010124829564539837,
+      "abs_delta": 1.9081958235744878e-17
     },
     {
       "file": "benchmark_summary.json",
@@ -222,23 +180,44 @@
     },
     {
       "file": "benchmark_summary.json",
-      "path": "generalization.sender_disjoint_holdout.models.random_forest.per_seed[0].validation_calibrated_threshold_at_far_5.0pct",
-      "first": 0.21985982172366222,
-      "second": 0.21985982172366228,
+      "path": "generalization.sender_disjoint_holdout.models.random_forest.per_seed[0].validation_f1_threshold",
+      "first": 0.4948628888236849,
+      "second": 0.494862888823685,
+      "abs_delta": 1.1102230246251565e-16
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.sender_disjoint_holdout.models.random_forest.per_seed[1].validation_calibrated_threshold_at_far_1.0pct",
+      "first": 0.4425631721909287,
+      "second": 0.4425631721909286,
+      "abs_delta": 1.1102230246251565e-16
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.sender_disjoint_holdout.models.random_forest.per_seed[1].validation_f1_threshold",
+      "first": 0.4836130355158418,
+      "second": 0.48361303551584184,
       "abs_delta": 5.551115123125783e-17
     },
     {
       "file": "benchmark_summary.json",
       "path": "generalization.sender_disjoint_holdout.models.random_forest.per_seed[2].validation_calibrated_threshold_at_far_1.0pct",
-      "first": 0.4467025268893141,
-      "second": 0.44670252688931417,
+      "first": 0.44670252688931417,
+      "second": 0.4467025268893141,
       "abs_delta": 5.551115123125783e-17
     },
     {
       "file": "benchmark_summary.json",
-      "path": "generalization.sender_disjoint_holdout.models.random_forest.per_seed[3].validation_calibrated_threshold_at_far_5.0pct",
-      "first": 0.2188917638468057,
-      "second": 0.21889176384680567,
+      "path": "generalization.sender_disjoint_holdout.models.random_forest.per_seed[2].validation_f1_threshold",
+      "first": 0.491431770550416,
+      "second": 0.49143177055041604,
+      "abs_delta": 5.551115123125783e-17
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "generalization.sender_disjoint_holdout.models.random_forest.per_seed[4].validation_calibrated_threshold_at_far_5.0pct",
+      "first": 0.21855244421330675,
+      "second": 0.21855244421330677,
       "abs_delta": 2.7755575615628914e-17
     },
     {
@@ -251,16 +230,9 @@
     {
       "file": "benchmark_summary.json",
       "path": "models.random_forest.mean_std_across_training_seeds.validation_f1_threshold.std",
-      "first": 0.03130403939856551,
-      "second": 0.03130403939856553,
-      "abs_delta": 1.3877787807814457e-17
-    },
-    {
-      "file": "benchmark_summary.json",
-      "path": "models.random_forest.per_seed[1].validation_f1_threshold",
-      "first": 0.49029411910713805,
-      "second": 0.490294119107138,
-      "abs_delta": 5.551115123125783e-17
+      "first": 0.0313040393985655,
+      "second": 0.03130403939856552,
+      "abs_delta": 2.0816681711721685e-17
     },
     {
       "file": "benchmark_summary.json",
@@ -271,58 +243,79 @@
     },
     {
       "file": "benchmark_summary.json",
+      "path": "models.random_forest.per_seed[4].validation_f1_threshold",
+      "first": 0.47013871750167374,
+      "second": 0.4701387175016737,
+      "abs_delta": 5.551115123125783e-17
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "per_attack_category.dataReplay.models.random_forest.mean_std_across_training_seeds.validation_calibrated_threshold_at_far_1.0pct.mean",
+      "first": 0.5858422994220249,
+      "second": 0.5858422994220248,
+      "abs_delta": 1.1102230246251565e-16
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "per_attack_category.dataReplay.models.random_forest.mean_std_across_training_seeds.validation_calibrated_threshold_at_far_1.0pct.std",
+      "first": 0.007517762295844508,
+      "second": 0.007517762295844537,
+      "abs_delta": 2.949029909160572e-17
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "per_attack_category.dataReplay.models.random_forest.mean_std_across_training_seeds.validation_calibrated_threshold_at_far_5.0pct.std",
+      "first": 0.003523098871152006,
+      "second": 0.003523098871152007,
+      "abs_delta": 8.673617379884035e-19
+    },
+    {
+      "file": "benchmark_summary.json",
+      "path": "per_attack_category.dataReplay.models.random_forest.mean_std_across_training_seeds.validation_f1_threshold.mean",
+      "first": 0.3706469521438767,
+      "second": 0.3706469521438766,
+      "abs_delta": 1.1102230246251565e-16
+    },
+    {
+      "file": "benchmark_summary.json",
       "path": "per_attack_category.dosAttack.models.random_forest.mean_std_across_training_seeds.f1_cyber_vs_benign.mean",
-      "first": 0.9933477727581371,
-      "second": 0.9933293454573187,
-      "abs_delta": 1.8427300818468773e-05
+      "first": 0.9933385603865099,
+      "second": 0.9933477727581371,
+      "abs_delta": 9.21237162720967e-06
     },
     {
       "file": "benchmark_summary.json",
       "path": "per_attack_category.dosAttack.models.random_forest.mean_std_across_training_seeds.f1_cyber_vs_benign.std",
-      "first": 0.00023534333264609413,
-      "second": 0.00022129315059283457,
-      "abs_delta": 1.4050182053259555e-05
+      "first": 0.00023089368139070677,
+      "second": 0.00023534333264609413,
+      "abs_delta": 4.449651255387357e-06
     },
     {
       "file": "benchmark_summary.json",
       "path": "per_attack_category.dosAttack.models.random_forest.mean_std_across_training_seeds.validation_calibrated_threshold_at_far_1.0pct.mean",
       "first": 0.4043142636723995,
-      "second": 0.4043142636723994,
-      "abs_delta": 5.551115123125783e-17
+      "second": 0.4043142636723996,
+      "abs_delta": 1.1102230246251565e-16
     },
     {
       "file": "benchmark_summary.json",
       "path": "per_attack_category.dosAttack.models.random_forest.mean_std_across_training_seeds.validation_calibrated_threshold_at_far_1.0pct.std",
-      "first": 0.0026998196393495603,
-      "second": 0.002699819639349594,
-      "abs_delta": 3.382710778154774e-17
-    },
-    {
-      "file": "benchmark_summary.json",
-      "path": "per_attack_category.dosAttack.models.random_forest.mean_std_across_training_seeds.validation_calibrated_threshold_at_far_5.0pct.std",
-      "first": 0.0035054632303589215,
-      "second": 0.0035054632303589254,
-      "abs_delta": 3.903127820947816e-18
-    },
-    {
-      "file": "benchmark_summary.json",
-      "path": "per_attack_category.dosAttack.models.random_forest.mean_std_across_training_seeds.validation_f1_threshold.std",
-      "first": 0.090110831815834,
-      "second": 0.09011083181583406,
-      "abs_delta": 5.551115123125783e-17
+      "first": 0.002699819639349606,
+      "second": 0.0026998196393496062,
+      "abs_delta": 4.336808689942018e-19
     }
   ],
   "nonzero_deltas_truncated": false,
   "non_numeric_mismatches": [],
   "checkpoint_sha256": {
-    "compared": 285,
-    "identical": 285,
+    "compared": 290,
+    "identical": 290,
     "different": []
   },
   "derived_file_sha256": {
     "seed_metrics.csv": {
-      "first_sha256": "af92f84f721e420060454ed4a4290adbd12d8ce4eff64ddf2336893ad23e3e5a",
-      "second_sha256": "d578bc240b0e1581077eb0e765317b2c9f4dd6104851dabe95549cdb0b3aa777",
+      "first_sha256": "75b177a5a5e7910731cf1d65bb283dbe5057f8a428144118c40165d19c1eba56",
+      "second_sha256": "efee10c468c3e61100f553080909b50ca86bf5d641333f32bc813e49d0eb1256",
       "identical": false
     },
     "bootstrap_preview.csv": {
@@ -351,17 +344,17 @@
       "identical": true
     },
     "results_ablation.tex": {
-      "first_sha256": "0963a0a33389650b0b465e8ae2e30efce45f2128c373b900a73719493763d8f1",
-      "second_sha256": "0963a0a33389650b0b465e8ae2e30efce45f2128c373b900a73719493763d8f1",
+      "first_sha256": "b9750f1d1e846aafac614c980734d92976817db5a1e2d8d6eb6da9d48959105a",
+      "second_sha256": "b9750f1d1e846aafac614c980734d92976817db5a1e2d8d6eb6da9d48959105a",
       "identical": true
     },
     "results_macros.tex": {
-      "first_sha256": "fe0e9255468ed8d1feb6e303b112a0e2df858bff64398d7431895abefdaeb584",
-      "second_sha256": "fe0e9255468ed8d1feb6e303b112a0e2df858bff64398d7431895abefdaeb584",
+      "first_sha256": "9863d56e0487b2b8fc1f37ce0bd2924bc4978cd003512587b4b9d7a43f5f3335",
+      "second_sha256": "9863d56e0487b2b8fc1f37ce0bd2924bc4978cd003512587b4b9d7a43f5f3335",
       "identical": true
     }
   },
-  "timing_fields_excluded": 985,
+  "timing_fields_excluded": 1007,
   "timing_exclusion_rule": [
     "inference_ms_per_event",
     "runtime_seconds",

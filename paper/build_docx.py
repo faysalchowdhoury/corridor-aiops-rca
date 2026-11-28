@@ -30,7 +30,10 @@ def _inline_inputs(text: str, base: Path) -> str:
     return re.sub(r"\\input\{([^}]+)\}", replace, text)
 
 
-ROMAN = ("I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII")
+ROMAN = (
+    "I", "II", "III", "IV", "V", "VI", "VII", "VIII",
+    "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI",
+)
 
 
 def _closing_brace(text: str, opening: int) -> int:

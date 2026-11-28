@@ -11,6 +11,7 @@ from sklearn.metrics import roc_auc_score
 
 BATCH_SIZE = 128
 EARLY_STOPPING_PATIENCE = 2
+SELECTION_METRICS = ("validation_auroc", "benign_reconstruction_loss")
 
 
 @dataclass(frozen=True)
@@ -83,8 +84,20 @@ def _train_with_validation_checkpoint(
     validation_scores: Callable[[], np.ndarray],
     validation_labels: np.ndarray,
     optimizer,
+    selection_metric: str = "validation_auroc",
 ) -> dict[str, Any]:
-    """Train with AdamW; keep the epoch with best validation AUROC (patience 2)."""
+    """Train with AdamW; keep the best epoch on the selection metric (patience 2).
+
+    ``validation_auroc`` maximizes attacker-versus-benign AUROC on the validation split
+    and therefore uses attacker labels. ``benign_reconstruction_loss`` minimizes the mean
+    score (masked reconstruction error) over validation records with label 0 only, so no
+    attacker record and no attacker-versus-benign metric enters checkpoint selection.
+    """
+    if selection_metric not in SELECTION_METRICS:
+        raise ValueError(f"Unknown selection_metric: {selection_metric}")
+    benign_validation = np.asarray(validation_labels) == 0
+    if selection_metric == "benign_reconstruction_loss" and not benign_validation.any():
+        raise ValueError("Label-free selection requires non-malicious validation records")
     rng = np.random.default_rng(seed)
     best_auc = -np.inf
     best_state = None
@@ -100,7 +113,11 @@ def _train_with_validation_checkpoint(
             loss.backward()
             optimizer.step()
         model.eval()
-        auc = float(roc_auc_score(validation_labels, validation_scores()))
+        if selection_metric == "validation_auroc":
+            auc = float(roc_auc_score(validation_labels, validation_scores()))
+        else:
+            # higher is better: negative mean benign reconstruction error
+            auc = -float(np.mean(validation_scores()[benign_validation]))
         if auc > best_auc:
             best_auc = auc
             best_state = {
@@ -116,10 +133,18 @@ def _train_with_validation_checkpoint(
         raise RuntimeError("Model did not produce a validation checkpoint")
     model.load_state_dict(best_state)
     model.eval()
+    selected = (
+        {"selected_validation_auroc": best_auc}
+        if selection_metric == "validation_auroc"
+        else {
+            "selection_metric": selection_metric,
+            "selected_validation_benign_reconstruction_loss": -best_auc,
+        }
+    )
     return {
         "epochs_run": epochs_run,
         "selected_epoch": best_epoch,
-        "selected_validation_auroc": best_auc,
+        **selected,
         "checkpoint_sha256": state_dict_sha256(best_state),
     }
 
@@ -131,7 +156,14 @@ def fit_lstm_autoencoder(
     *,
     epochs: int,
     seed: int,
+    selection_metric: str = "validation_auroc",
 ) -> dict[str, Any]:
+    """Train on non-malicious training sequences only.
+
+    ``selection_metric="validation_auroc"`` (the main benchmark) selects the checkpoint
+    with attacker labels on the validation split; ``"benign_reconstruction_loss"`` is
+    the label-free control that selects on non-malicious validation records only.
+    """
     torch = _torch()
     from corridor_aiops.models.lstm_autoencoder import (
         LSTMAutoencoder,
@@ -169,6 +201,7 @@ def fit_lstm_autoencoder(
         validation_scores=lambda: _predict(score(validation), len(validation.labels), torch)[0],
         validation_labels=validation.labels,
         optimizer=optimizer,
+        selection_metric=selection_metric,
     )
     training_seconds = time.perf_counter() - started
     validation_scores, _ = _predict(score(validation), len(validation.labels), torch)
@@ -178,7 +211,11 @@ def fit_lstm_autoencoder(
         "test_scores": test_scores,
         "inference_ms_per_event": inference_ms,
         "training_seconds": training_seconds,
-        "training_status": "trained_on_non_malicious_training_sequences",
+        "training_status": (
+            "benign_only_training_with_validation_auroc_selection"
+            if selection_metric == "validation_auroc"
+            else "benign_only_training_with_label_free_benign_reconstruction_selection"
+        ),
         "training_records": int(len(benign)),
         **selection,
     }

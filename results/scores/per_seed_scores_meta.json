@@ -1,6 +1,6 @@
 {
   "scores_file": "scores/per_seed_scores.npz",
-  "scores_sha256": "472e76af86f40147535a3ca12c042bcfee3fdd9648da014e71bc88678034f319",
+  "scores_sha256": "1757f660e63246114b93024def8cdb96e7f7307d6609d7318219419da46849e1",
   "tolerance": 1e-06,
   "verification_against_benchmark_summary": {
     "official": {
@@ -13,14 +13,14 @@
     "loao:dataReplay->dosAttack": {
       "per_seed_metric_values_compared": 765,
       "values_over_tolerance": 0,
-      "max_abs_delta": 1.8078884944650042e-08,
+      "max_abs_delta": 8.281143659694123e-09,
       "checkpoint_hashes_matched": 45,
       "checkpoint_hashes_compared": 45
     },
     "loao:dosAttack->dataReplay": {
       "per_seed_metric_values_compared": 765,
       "values_over_tolerance": 0,
-      "max_abs_delta": 2.7755575615628914e-17,
+      "max_abs_delta": 1.1102230246251565e-16,
       "checkpoint_hashes_matched": 45,
       "checkpoint_hashes_compared": 45
     }

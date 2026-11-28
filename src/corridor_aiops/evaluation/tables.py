@@ -218,6 +218,7 @@ def _ablation_table(summary: dict[str, Any], ablation: dict[str, Any]) -> list[s
         "local_density": "No local density",
         "validity_masks": "No validity masks",
         "one_class_window_length": "One-class $L=10$",
+        "autoencoder_checkpoint_selection": "Label-free checkpoint",
     }
     body = [
         "Ablation & Model & F1 & AUROC & $\\Delta$AUROC & $\\Delta$TPR@FAR 1\\% \\\\",
@@ -270,6 +271,7 @@ MACRO_MODEL_NAMES = {
     "tabular_transformer": "TabTransformer",
     "isolation_forest_L10": "IsolationForestTen",
     "one_class_svm_L10": "OneClassSVMTen",
+    "lstm_autoencoder_unsupervised_ckpt": "LSTMAELabelFree",
 }
 MACRO_METRICS = {
     "f1_cyber_vs_benign": ("FOne", 1.0, 3),
@@ -552,10 +554,15 @@ def write_macros(summary: dict[str, Any], ablation: dict[str, Any] | None, path:
             "local_density": "Density",
             "validity_masks": "Masks",
             "one_class_window_length": "OneClassWindow",
+            "autoencoder_checkpoint_selection": "AECheckpoint",
         }
         for family, block in ablation["ablations"].items():
             for name, result in block["models"].items():
-                if name in ("isolation_forest_L10", "one_class_svm_L10"):
+                if name in (
+                    "isolation_forest_L10",
+                    "one_class_svm_L10",
+                    "lstm_autoencoder_unsupervised_ckpt",
+                ):
                     tag = MACRO_MODEL_NAMES[name]
                 else:
                     tag = "TT" if name == "tabular_transformer" else "Top"

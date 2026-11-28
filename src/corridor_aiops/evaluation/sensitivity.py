@@ -101,6 +101,26 @@ SUBGROUP_TAGS = {
     "attacker_no_ground_truth": "Injected",
     "attacker_payload_matches": "Genuine",
 }
+# VeReMi NextGen labels attackers at sender level during attack windows. Records whose
+# payload the official ground truth contradicts (replay divergence) or lacks (injected
+# flood messages) are message-corroborated; dosAttack records whose payload equals the
+# genuine sender state are labeled only because their sender is the attacker.
+LABEL_GRANULARITY_GROUPS = {
+    "message_corroborated": ("attacker_payload_differs", "attacker_no_ground_truth"),
+    "sender_level_genuine_state": ("attacker_payload_matches",),
+}
+LABEL_GRANULARITY_TAGS = {
+    "message_corroborated": "Msg",
+    "sender_level_genuine_state": "SenderLevel",
+}
+EFFECT_SIZE_NOTE = (
+    "Percentile intervals from a cluster bootstrap whose minority class is concentrated "
+    "in relatively few sender clusters can be too narrow or biased when a small number of "
+    "attacker clusters dominates a metric, and they condition on one fixed set of test "
+    "senders. Seed-level effect sizes rest on few training seeds, so the standardized "
+    "effect d_z (mean paired difference divided by its seed standard deviation) is "
+    "imprecise and undefined when the paired difference has zero variance."
+)
 
 
 # ---------------------------------------------------------------------------
@@ -360,6 +380,7 @@ def seed_bootstrap_sensitivity(
             verdicts = [ci_verdict(row["ci_95pct"]) for row in rows]
             means = [row["mean"] for row in rows]
             comparisons[name][metric] = {
+                "effect_size": seed_effect_size(summary, name, metric, rows),
                 "per_seed": {
                     str(seed): {**row, "verdict": verdict}
                     for seed, row, verdict in zip(seeds, rows, verdicts, strict=True)
@@ -408,6 +429,7 @@ def seed_bootstrap_sensitivity(
             "reference_better: 95% CI of (Transformer - model) above 0; reference_worse: "
             "CI below 0; inconclusive: CI contains 0"
         ),
+        "effect_size_note": EFFECT_SIZE_NOTE,
         "comparisons": comparisons,
         "ci_verdict_stable_count": stable,
         "comparison_count": total,
@@ -418,6 +440,174 @@ def seed_bootstrap_sensitivity(
             }
             for seed, block in per_seed.items()
         },
+    }
+
+
+def seed_effect_size(
+    summary: dict[str, Any], name: str, metric: str, bootstrap_rows: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Seed-level paired effect of the reference model over ``name``.
+
+    The paired difference per seed is the reference metric minus the model metric on the
+    full official test split (no resampling). d_z is its mean over its sample standard
+    deviation across seeds; it is ``None`` when that deviation is zero.
+    """
+    key = metric.removeprefix("delta_")
+    reference = summary["models"][REFERENCE_MODEL]["per_seed"]
+    other = summary["models"][name]["per_seed"]
+    deltas = np.asarray(
+        [float(r[key]) - float(o[key]) for r, o in zip(reference, other, strict=True)]
+    )
+    sd = float(deltas.std(ddof=1)) if deltas.size > 1 else 0.0
+    fractions = [float(row["fraction_of_replicates_reference_better"]) for row in bootstrap_rows]
+    return {
+        "paired_difference_per_seed": deltas.tolist(),
+        "mean_paired_difference": float(deltas.mean()),
+        "sd_paired_difference": sd,
+        "standardized_effect_dz": float(deltas.mean() / sd) if sd > 1e-12 else None,
+        "fraction_of_replicates_reference_better_per_seed": fractions,
+        "fraction_of_replicates_reference_better_mean": float(np.mean(fractions)),
+    }
+
+
+def sender_overlap_breakdown(
+    table: EventTable, summary: dict[str, Any], scores: _Scores
+) -> dict[str, Any]:
+    """Official test split divided into senders seen and unseen in the official train split.
+
+    A test message is seen-sender when its bare source_id occurs in the official training
+    split of the same archive. Every model uses its own pooled validation-F1 threshold.
+    """
+    seeds = list(summary["protocol"]["training_seeds"])
+    labels = table.labels
+    test = scores.rows("official", "test")
+    train = table.rows(split="train")
+    seen = np.zeros(len(test), dtype=bool)
+    counts: dict[str, Any] = {}
+    for archive in sorted(set(table.archive.tolist())):
+        train_sources = set(table.source[train][table.archive[train] == archive].tolist())
+        in_archive = table.archive[test] == archive
+        archive_seen = in_archive & np.isin(table.source[test], sorted(train_sources))
+        seen |= archive_seen
+        block = {}
+        for group, mask in (("seen", archive_seen), ("unseen", in_archive & ~archive_seen)):
+            block[group] = {
+                "senders": int(len(set(table.source[test][mask].tolist()))),
+                "attacker_senders": int(
+                    len(set(table.source[test][mask & (labels[test] == 1)].tolist()))
+                ),
+                "messages": int(mask.sum()),
+                "attacker_messages": int(labels[test][mask].sum()),
+            }
+        counts[archive] = block
+    groups = {"seen": seen, "unseen": ~seen}
+    models: dict[str, Any] = {}
+    for name in summary["models"]:
+        threshold_seed = [_threshold(summary["models"], name, i) for i in range(len(seeds))]
+        block: dict[str, Any] = {}
+        for group, mask in groups.items():
+            rows = []
+            for i, seed in enumerate(seeds):
+                t_scores = scores.get("official", name, seed, "test")[mask]
+                row = confusion(labels[test][mask], t_scores, threshold_seed[i])
+                row["auroc"] = _auroc(labels[test][mask], t_scores)
+                rows.append(row)
+            block[group] = {"per_seed": rows, "mean_std": _mean_std(rows)}
+        models[name] = block
+    sender_disjoint = summary["generalization"]["sender_disjoint_holdout"]
+    return {
+        "definition": (
+            "seen-sender test messages: official test messages whose bare source_id occurs "
+            "in the official training split of the same archive; unseen-sender: all other "
+            "official test messages. Thresholds are the pooled validation-F1 thresholds."
+        ),
+        "counts_by_archive": counts,
+        "models": models,
+        "sender_disjoint_holdout_all_models": {
+            name: {
+                metric: block["mean_std_across_training_seeds"][metric]
+                for metric in ("auroc", "f1_cyber_vs_benign", "false_alarm_rate_non_malicious")
+            }
+            for name, block in sender_disjoint["models"].items()
+        },
+    }
+
+
+def _group_metrics(
+    labels: np.ndarray, outcomes: np.ndarray, scores: np.ndarray, threshold: float
+) -> dict[str, float | None]:
+    out: dict[str, float | None] = {}
+    benign = labels == 0
+    for group, members_of in LABEL_GRANULARITY_GROUPS.items():
+        members = np.isin(outcomes, members_of)
+        out[f"{group}|count"] = float(members.sum())
+        if not members.any():
+            out[f"{group}|recall"] = None
+            out[f"{group}|auroc_vs_all_non_malicious"] = None
+            continue
+        selected = benign | members
+        out[f"{group}|recall"] = float(np.mean(scores[members] >= threshold))
+        out[f"{group}|auroc_vs_all_non_malicious"] = _auroc(
+            members[selected].astype(int), scores[selected]
+        )
+    return out
+
+
+def label_granularity_breakdown(
+    table: EventTable, summary: dict[str, Any], scores: _Scores, outcomes: np.ndarray
+) -> dict[str, Any]:
+    """Message-corroborated versus sender-level-labeled attacker records, all models."""
+    seeds = list(summary["protocol"]["training_seeds"])
+    labels = table.labels
+    contexts: dict[str, Any] = {}
+    test = scores.rows("official", "test")
+    loao = summary["generalization"]["leave_one_attack_type_out"]
+    plans = [("official", "official", None, summary["models"])]
+    plans += [
+        (f"loao:{direction}", f"loao:{direction}", None, block["models"])
+        for direction, block in loao.items()
+        if block.get("status") == "EVALUABLE"
+    ]
+    for name_key, score_key, _, reference in plans:
+        rows_test = test if score_key == "official" else scores.rows(score_key, "test")
+        block: dict[str, Any] = {
+            "protocol": (
+                "pooled official models on the full official test split with their pooled "
+                "validation-F1 thresholds"
+                if score_key == "official"
+                else "LOAO models with source-category validation-F1 thresholds"
+            ),
+            "group_counts": {
+                group: int(np.isin(outcomes[rows_test], members).sum())
+                for group, members in LABEL_GRANULARITY_GROUPS.items()
+            },
+            "models": {},
+        }
+        for name in summary["models"]:
+            per_seed = []
+            for index, seed in enumerate(seeds):
+                t_scores = scores.get(score_key, name, seed, "test")
+                per_seed.append(
+                    _group_metrics(
+                        labels[rows_test],
+                        outcomes[rows_test],
+                        t_scores,
+                        _threshold(reference, name, index),
+                    )
+                )
+            block["models"][name] = {"per_seed": per_seed, "mean_std": _mean_std(per_seed)}
+        contexts[name_key] = block
+    return {
+        "definition": (
+            "VeReMi NextGen assigns attacker labels at sender level during attack windows. "
+            "message_corroborated: attacker records whose payload diverges from the official "
+            "ground truth (dataReplay) or that have no ground-truth broadcast (dosAttack "
+            "injected); sender_level_genuine_state: dosAttack attacker records whose payload "
+            "equals the genuine sender state, which a detector can flag only through window "
+            "context such as timing, not through payload falsification. AUROC compares each "
+            "group with all non-malicious test records of the same context."
+        ),
+        "contexts": contexts,
     }
 
 
@@ -1047,29 +1237,96 @@ def _feature_table(diagnostics: dict[str, Any]) -> list[str]:
     return body
 
 
-def _subgroup_table(summary: dict[str, Any], diagnostics: dict[str, Any]) -> list[str]:
-    focus = generalization_focus_models(summary)
-    body = [
-        "& & \\multicolumn{2}{c}{Injected (no ground-truth broadcast)} & "
-        "\\multicolumn{2}{c}{Genuine content (matches ground truth)} \\\\",
-        "\\cmidrule(lr){3-4}\\cmidrule(lr){5-6}",
-        "Context & Model & AUROC & Recall & AUROC & Recall \\\\",
+def _regime_groups(summary: dict[str, Any]) -> list[tuple[str, list[str]]]:
+    return [
+        (
+            "Unsupervised / one-class (fit on non-malicious records)",
+            [n for n, b in summary["models"].items() if b["supervision_regime"] != "supervised"],
+        ),
+        (
+            "Supervised (fit on training labels)",
+            [n for n, b in summary["models"].items() if b["supervision_regime"] == "supervised"],
+        ),
     ]
-    for context, block in diagnostics["contexts"].items():
-        if not context.endswith("dosAttack") or context.startswith("pooledthreshold:"):
-            continue
-        label = _context_label(context)
-        body.append("\\midrule")
-        for index, model in enumerate(m for m in block["models"] if m in focus):
-            stats = block["models"][model]["subgroups_mean_std"]
+
+
+def _cell(stats: dict[str, Any], key: str, scale: float = 1.0, digits: int = 3) -> str:
+    entry = stats.get(key)
+    return "n/a" if entry is None else f"{scale * entry['mean']:.{digits}f}"
+
+
+def _label_granularity_table(summary: dict[str, Any], diagnostics: dict[str, Any]) -> list[str]:
+    block = diagnostics["label_granularity"]["contexts"]
+    contexts = [key for key in block if key == "official"] + [
+        key for key in block if key.startswith("loao:dataReplay")
+    ]
+    titles = {"official": "Pooled official test"}
+    body = [
+        "& "
+        + " & ".join(
+            f"\\multicolumn{{4}}{{c}}{{{titles[c] if c in titles else _context_label(c)}}}"
+            for c in contexts
+        )
+        + " \\\\",
+        "\\cmidrule(lr){2-5}\\cmidrule(lr){6-9}",
+        "& "
+        + " & ".join(
+            "\\multicolumn{2}{c}{Message-corroborated} & \\multicolumn{2}{c}{Sender-level}"
+            for _ in contexts
+        )
+        + " \\\\",
+        "\\cmidrule(lr){2-3}\\cmidrule(lr){4-5}\\cmidrule(lr){6-7}\\cmidrule(lr){8-9}",
+        "Model" + " & AUROC & Recall & AUROC & Recall" * len(contexts) + " \\\\",
+    ]
+    width = 1 + 4 * len(contexts)
+    for title, names in _regime_groups(summary):
+        body += ["\\midrule", f"\\multicolumn{{{width}}}{{l}}{{\\textit{{{title}}}}} \\\\"]
+        for name in names:
             cells = []
-            for group in ("attacker_no_ground_truth", "attacker_payload_matches"):
-                for metric in ("auroc_vs_all_non_malicious", "recall"):
-                    entry = stats[f"{group}|{metric}"]
-                    cells.append(f"{entry['mean']:.3f} $\\pm$ {entry['std']:.3f}")
+            for context in contexts:
+                stats = block[context]["models"][name]["mean_std"]
+                for group in LABEL_GRANULARITY_GROUPS:
+                    cells += [
+                        _cell(stats, f"{group}|auroc_vs_all_non_malicious"),
+                        _cell(stats, f"{group}|recall"),
+                    ]
             body.append(
-                f"{label if index == 0 else ''} & "
-                f"{_escape(summary['models'][model]['display_name'])} & "
+                f"{_escape(summary['models'][name]['display_name'])} & "
+                + " & ".join(cells)
+                + " \\\\"
+            )
+    return body
+
+
+def _sender_overlap_table(summary: dict[str, Any], diagnostics: dict[str, Any]) -> list[str]:
+    overlap = diagnostics["sender_overlap"]
+    body = [
+        "& \\multicolumn{3}{c}{Official test, seen senders} & "
+        "\\multicolumn{3}{c}{Official test, unseen senders} & "
+        "\\multicolumn{3}{c}{Sender-disjoint holdout} \\\\",
+        "\\cmidrule(lr){2-4}\\cmidrule(lr){5-7}\\cmidrule(lr){8-10}",
+        "Model & AUROC & Recall & FAR (\\%) & AUROC & Recall & FAR (\\%) "
+        "& AUROC & F1 & FAR (\\%) \\\\",
+    ]
+    for title, names in _regime_groups(summary):
+        body += ["\\midrule", f"\\multicolumn{{10}}{{l}}{{\\textit{{{title}}}}} \\\\"]
+        for name in names:
+            cells = []
+            for group in ("seen", "unseen"):
+                stats = overlap["models"][name][group]["mean_std"]
+                cells += [
+                    _cell(stats, "auroc"),
+                    _cell(stats, "recall"),
+                    _cell(stats, "false_alarm_rate", 100.0, 2),
+                ]
+            disjoint = overlap["sender_disjoint_holdout_all_models"][name]
+            cells += [
+                _cell(disjoint, "auroc"),
+                _cell(disjoint, "f1_cyber_vs_benign"),
+                _cell(disjoint, "false_alarm_rate_non_malicious", 100.0, 2),
+            ]
+            body.append(
+                f"{_escape(summary['models'][name]['display_name'])} & "
                 + " & ".join(cells)
                 + " \\\\"
             )
@@ -1269,6 +1526,52 @@ def _extra_macro_lines(summary: dict[str, Any], diagnostics: dict[str, Any]) -> 
     )
     define("ResThrYoudenFARUpAllSeedsSup", youden_far_up)
     define("ResThrSupCount", len(supervised))
+
+    overlap = diagnostics["sender_overlap"]
+    for group, tag in (("seen", "Seen"), ("unseen", "Unseen")):
+        for key, suffix in (
+            ("senders", "Senders"),
+            ("attacker_senders", "AttackerSenders"),
+            ("messages", "Messages"),
+            ("attacker_messages", "Attackers"),
+        ):
+            define(
+                f"Res{tag}{suffix}",
+                count(sum(block[group][key] for block in overlap["counts_by_archive"].values())),
+            )
+        for name, block in overlap["models"].items():
+            stats = block[group]["mean_std"]
+            model_tag = MACRO_MODEL_NAMES[name]
+            define(f"Res{tag}{model_tag}AUROC", _cell(stats, "auroc"))
+            define(f"Res{tag}{model_tag}Recall", _cell(stats, "recall"))
+            define(f"Res{tag}{model_tag}FAR", _cell(stats, "false_alarm_rate", 100.0, 2))
+    define(
+        "ResSeenSendersPerArchive",
+        count(max(b["seen"]["senders"] for b in overlap["counts_by_archive"].values())),
+    )
+    gaps = {
+        name: overlap["models"][name]["seen"]["mean_std"]["auroc"]["mean"]
+        - overlap["models"][name]["unseen"]["mean_std"]["auroc"]["mean"]
+        for name in supervised
+    }
+    define("ResSeenUnseenSupGapMin", f"{min(gaps.values()):+.3f}")
+    define("ResSeenUnseenSupGapMax", f"{max(gaps.values()):+.3f}")
+    for name, block in overlap["sender_disjoint_holdout_all_models"].items():
+        define(f"ResSD{MACRO_MODEL_NAMES[name]}AUROC", _cell(block, "auroc"))
+
+    granularity = diagnostics["label_granularity"]["contexts"]
+    for context, block in granularity.items():
+        ctag = "Pooled" if context == "official" else _context_tag(context)
+        for group, gtag in LABEL_GRANULARITY_TAGS.items():
+            define(f"ResLbl{ctag}{gtag}Count", count(block["group_counts"][group]))
+            for name, result in block["models"].items():
+                stats = result["mean_std"]
+                model_tag = MACRO_MODEL_NAMES[name]
+                define(
+                    f"ResLbl{ctag}{model_tag}{gtag}AUROC",
+                    _cell(stats, f"{group}|auroc_vs_all_non_malicious"),
+                )
+                define(f"ResLbl{ctag}{model_tag}{gtag}Recall", _cell(stats, f"{group}|recall"))
     return lines
 
 
@@ -1316,6 +1619,18 @@ def _write_macros(
             define(f"ResSeedBoot{tag}{suffix}Verdict", _verdict_cell(block))
             define(f"ResSeedBoot{tag}{suffix}Envelope", _ci(block["ci_envelope"]))
             define(f"ResSeedBoot{tag}{suffix}Means", _ci(block["mean_range"]))
+            effect = block["effect_size"]
+            define(f"ResEff{tag}{suffix}Delta", f"{effect['mean_paired_difference']:+.3f}")
+            define(
+                f"ResEff{tag}{suffix}DZ",
+                "undefined"
+                if effect["standardized_effect_dz"] is None
+                else f"{effect['standardized_effect_dz']:+.1f}",
+            )
+            define(
+                f"ResEff{tag}{suffix}Frac",
+                f"{effect['fraction_of_replicates_reference_better_mean']:.2f}",
+            )
     features = diagnostics["features"]
     for name, block in features["features"].items():
         for archive in features["archives"]:
@@ -1424,6 +1739,10 @@ def analyze(
     )
     diagnostics["loao_sender_disjoint"] = json.loads(dedup_path.read_text(encoding="utf-8"))
     diagnostics["threshold_procedures"] = threshold_procedures(table, summary, scores)
+    diagnostics["sender_overlap"] = sender_overlap_breakdown(table, summary, scores)
+    diagnostics["label_granularity"] = label_granularity_breakdown(
+        table, summary, scores, outcomes
+    )
     (results_dir / "loao_diagnostics.json").write_text(
         json.dumps(diagnostics, indent=2, allow_nan=False) + "\n", encoding="utf-8"
     )
@@ -1442,9 +1761,15 @@ def analyze(
     _write(results_dir / "results_feature_shift.tex", "lcccccc", 7, _feature_table(diagnostics))
     _write(
         results_dir / "results_loao_subgroups.tex",
-        "llcccc",
-        6,
-        _subgroup_table(summary, diagnostics),
+        "lcccccccc",
+        9,
+        _label_granularity_table(summary, diagnostics),
+    )
+    _write(
+        results_dir / "results_sender_overlap.tex",
+        "lccccccccc",
+        10,
+        _sender_overlap_table(summary, diagnostics),
     )
     _write(
         results_dir / "results_loao_dedup.tex", "llcccccccc", 10, _dedup_table(summary, diagnostics)

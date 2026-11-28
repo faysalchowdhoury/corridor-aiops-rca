@@ -76,7 +76,12 @@ REFERENCE_MODEL = "tabular_transformer"
 # baselines; reported only in the ablation summary so the 9-model schema is unchanged.
 ONE_CLASS_L10_MODELS = ("isolation_forest_L10", "one_class_svm_L10")
 ONE_CLASS_FIT_CAP = 10_000
+# Label-free checkpoint control for the LSTM autoencoder: the main model trains on
+# non-malicious sequences but selects its checkpoint by validation AUROC (attacker
+# labels); this control selects by mean benign validation reconstruction error only.
+AE_LABEL_FREE_MODEL = "lstm_autoencoder_unsupervised_ckpt"
 DISPLAY_NAMES = {
+    AE_LABEL_FREE_MODEL: "LSTM autoencoder (label-free checkpoint)",
     "isolation_forest_L10": "Isolation forest ($L=10$)",
     "one_class_svm_L10": "One-class SVM ($L=10$)",
     "robust_threshold_rules": "Robust rules",
@@ -112,7 +117,11 @@ def _xgboost_available() -> bool:
 
 
 def regime(model: str) -> str:
-    if model in UNSUPERVISED_MODELS or model in ONE_CLASS_L10_MODELS:
+    if (
+        model in UNSUPERVISED_MODELS
+        or model in ONE_CLASS_L10_MODELS
+        or model == AE_LABEL_FREE_MODEL
+    ):
         return "unsupervised_or_one_class"
     if model in SUPERVISED_MODELS:
         return "supervised"
@@ -419,13 +428,18 @@ def fit_model(
             "training_records": int(len(fit_rows)),
             "checkpoint_sha256": _pickle_sha256(model),
         }
-    elif name == "lstm_autoencoder":
+    elif name in {"lstm_autoencoder", AE_LABEL_FREE_MODEL}:
         result = fit_lstm_autoencoder(
             representation.sequence(train, labels),
             representation.sequence(validation, labels),
             representation.sequence(test, labels),
             epochs=epochs,
             seed=seed,
+            selection_metric=(
+                "benign_reconstruction_loss"
+                if name == AE_LABEL_FREE_MODEL
+                else "validation_auroc"
+            ),
         )
     elif name == "tabular_transformer":
         result = fit_tabular_transformer(
@@ -896,7 +910,13 @@ def run_models(
                 "training_status": fitted["training_status"],
                 "training_records": fitted["training_records"],
             }
-            for key in ("epochs_run", "selected_epoch", "selected_validation_auroc"):
+            for key in (
+                "epochs_run",
+                "selected_epoch",
+                "selected_validation_auroc",
+                "selection_metric",
+                "selected_validation_benign_reconstruction_loss",
+            ):
                 if key in fitted:
                     record[key] = fitted[key]
             per_seed.append(record)
@@ -1434,8 +1454,50 @@ def run_benchmark(
                     if key in full_stats and key not in TIMING_KEYS
                 },
             }
+        ae_summary, _, _ = run_models(
+            table,
+            official,
+            [AE_LABEL_FREE_MODEL],
+            config=FULL_CONFIG,
+            seeds=seeds,
+            epochs=epochs,
+            label="ablation label-free autoencoder checkpoint",
+        )
+        variant_stats = ae_summary[AE_LABEL_FREE_MODEL]["mean_std_across_training_seeds"]
+        full_stats = main_summary["lstm_autoencoder"]["mean_std_across_training_seeds"]
+        ablations["autoencoder_checkpoint_selection"] = {
+            "variant": "label_free_benign_reconstruction_checkpoint",
+            "description": (
+                "LSTM autoencoder trained on non-malicious training sequences exactly as in "
+                "the main benchmark, but the checkpoint is the epoch with the lowest mean "
+                "masked reconstruction error on non-malicious validation records; no "
+                "attacker record or attacker-versus-benign metric is used for training or "
+                "checkpoint selection. The main lstm_autoencoder selects its checkpoint by "
+                "validation AUROC. Alert thresholds of both remain validation-F1 thresholds."
+            ),
+            "feature_names": list(FULL_CONFIG.feature_names),
+            "window_length": FULL_CONFIG.window,
+            "validity_masks": FULL_CONFIG.use_masks,
+            "models": {
+                AE_LABEL_FREE_MODEL: {
+                    "display_name": DISPLAY_NAMES[AE_LABEL_FREE_MODEL],
+                    "compared_with": "lstm_autoencoder",
+                    "per_seed": ae_summary[AE_LABEL_FREE_MODEL]["per_seed"],
+                    "variant_mean_std_across_training_seeds": variant_stats,
+                    "full_mean_std_across_training_seeds": {
+                        key: full_stats[key] for key in variant_stats if key in full_stats
+                    },
+                    "variant_minus_full_mean": {
+                        key: variant_stats[key]["mean"] - full_stats[key]["mean"]
+                        for key in variant_stats
+                        if key in full_stats and key not in TIMING_KEYS
+                    },
+                }
+            },
+        }
         ablation_summary = {
             "one_class_controls": list(ONE_CLASS_L10_MODELS),
+            "label_free_checkpoint_control": AE_LABEL_FREE_MODEL,
             "protocol": (
                 "official train/validation/test splits; each variant changes one factor "
                 "relative to the full configuration; same training seeds; full-configuration "
@@ -1494,7 +1556,12 @@ def run_benchmark(
                     "normalized current-step features and validity masks; seeded sample of "
                     "at most 10,000 non-malicious training records"
                 ),
-                "lstm_autoencoder": "L = 10 sequence, masked reconstruction loss",
+                "lstm_autoencoder": (
+                    "L = 10 sequence, masked reconstruction loss; trained on non-malicious "
+                    "training sequences only; checkpoint selected by validation AUROC, which "
+                    "uses attacker labels (benign_only_training_with_validation_auroc_selection); "
+                    "the label-free checkpoint control is in ablation_summary.json"
+                ),
                 "tabular_transformer": "L = 10 sequence, causal attention, validity masks",
                 "flattened_window_models": (
                     "logistic regression, random forest, histogram gradient boosting, "

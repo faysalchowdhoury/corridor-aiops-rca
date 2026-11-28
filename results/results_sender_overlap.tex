@@ -1,0 +1,20 @@
+\begin{tabular}{lccccccccc}
+\toprule
+& \multicolumn{3}{c}{Official test, seen senders} & \multicolumn{3}{c}{Official test, unseen senders} & \multicolumn{3}{c}{Sender-disjoint holdout} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}
+Model & AUROC & Recall & FAR (\%) & AUROC & Recall & FAR (\%) & AUROC & F1 & FAR (\%) \\
+\midrule
+\multicolumn{10}{l}{\textit{Unsupervised / one-class (fit on non-malicious records)}} \\
+Robust rules & 0.741 & 0.834 & 42.96 & 0.822 & 0.839 & 22.17 & 0.811 & 0.702 & 27.36 \\
+Isolation forest & 0.765 & 0.847 & 38.82 & 0.817 & 0.864 & 26.79 & 0.851 & 0.776 & 15.98 \\
+One-class SVM & 0.888 & 0.778 & 4.50 & 0.893 & 0.795 & 1.76 & 0.925 & 0.895 & 1.70 \\
+LSTM autoencoder & 0.905 & 0.904 & 12.38 & 0.942 & 0.909 & 7.61 & 0.939 & 0.875 & 8.15 \\
+\midrule
+\multicolumn{10}{l}{\textit{Supervised (fit on training labels)}} \\
+Logistic regression & 0.989 & 0.901 & 0.53 & 0.983 & 0.913 & 4.49 & 0.992 & 0.954 & 1.08 \\
+Random forest & 0.992 & 0.932 & 2.11 & 0.993 & 0.936 & 1.83 & 0.995 & 0.960 & 1.22 \\
+Hist. gradient boosting & 0.992 & 0.936 & 2.47 & 0.993 & 0.939 & 2.35 & 0.996 & 0.963 & 0.64 \\
+Supervised MLP & 0.990 & 0.929 & 2.02 & 0.988 & 0.938 & 5.35 & 0.994 & 0.959 & 1.21 \\
+Tabular Transformer & 0.990 & 0.935 & 2.45 & 0.989 & 0.942 & 4.60 & 0.994 & 0.954 & 1.73 \\
+\bottomrule
+\end{tabular}

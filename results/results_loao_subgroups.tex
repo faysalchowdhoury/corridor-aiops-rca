@@ -1,17 +1,22 @@
-\begin{tabular}{llcccc}
+\begin{tabular}{lcccccccc}
 \toprule
-& & \multicolumn{2}{c}{Injected (no ground-truth broadcast)} & \multicolumn{2}{c}{Genuine content (matches ground truth)} \\
-\cmidrule(lr){3-4}\cmidrule(lr){5-6}
-Context & Model & AUROC & Recall & AUROC & Recall \\
+& \multicolumn{4}{c}{Pooled official test} & \multicolumn{4}{c}{LOAO dataReplay $\rightarrow$ dosAttack} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}
+& \multicolumn{2}{c}{Message-corroborated} & \multicolumn{2}{c}{Sender-level} & \multicolumn{2}{c}{Message-corroborated} & \multicolumn{2}{c}{Sender-level} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}
+Model & AUROC & Recall & AUROC & Recall & AUROC & Recall & AUROC & Recall \\
 \midrule
-Pooled, dosAttack test & LSTM autoencoder & 0.973 $\pm$ 0.000 & 0.999 $\pm$ 0.000 & 0.949 $\pm$ 0.001 & 0.961 $\pm$ 0.000 \\
- & Random forest & 1.000 $\pm$ 0.000 & 1.000 $\pm$ 0.000 & 0.994 $\pm$ 0.000 & 0.962 $\pm$ 0.001 \\
- & Hist. gradient boosting & 1.000 $\pm$ 0.000 & 1.000 $\pm$ 0.000 & 0.998 $\pm$ 0.000 & 0.960 $\pm$ 0.000 \\
- & Tabular Transformer & 1.000 $\pm$ 0.001 & 1.000 $\pm$ 0.000 & 0.996 $\pm$ 0.001 & 0.960 $\pm$ 0.002 \\
+\multicolumn{9}{l}{\textit{Unsupervised / one-class (fit on non-malicious records)}} \\
+Robust rules & 0.761 & 0.795 & 0.873 & 0.963 & 0.857 & 1.000 & 0.874 & 0.980 \\
+Isolation forest & 0.770 & 0.818 & 0.879 & 0.976 & 0.850 & 1.000 & 0.888 & 1.000 \\
+One-class SVM & 0.863 & 0.731 & 0.974 & 0.961 & 1.000 & 1.000 & 0.974 & 1.000 \\
+LSTM autoencoder & 0.922 & 0.889 & 0.949 & 0.961 & 0.973 & 1.000 & 0.953 & 0.961 \\
 \midrule
-LOAO dataReplay $\rightarrow$ dosAttack & LSTM autoencoder & 0.973 $\pm$ 0.000 & 1.000 $\pm$ 0.000 & 0.953 $\pm$ 0.000 & 0.961 $\pm$ 0.000 \\
- & Random forest & 0.812 $\pm$ 0.008 & 0.009 $\pm$ 0.003 & 0.803 $\pm$ 0.007 & 0.009 $\pm$ 0.003 \\
- & Hist. gradient boosting & 0.257 $\pm$ 0.000 & 0.007 $\pm$ 0.000 & 0.327 $\pm$ 0.000 & 0.011 $\pm$ 0.000 \\
- & Tabular Transformer & 0.806 $\pm$ 0.191 & 0.399 $\pm$ 0.546 & 0.900 $\pm$ 0.088 & 0.395 $\pm$ 0.518 \\
+\multicolumn{9}{l}{\textit{Supervised (fit on training labels)}} \\
+Logistic regression & 0.981 & 0.892 & 0.997 & 0.960 & 0.366 & 0.044 & 0.319 & 0.033 \\
+Random forest & 0.992 & 0.924 & 0.994 & 0.967 & 0.812 & 0.009 & 0.803 & 0.009 \\
+Hist. gradient boosting & 0.991 & 0.929 & 0.998 & 0.965 & 0.257 & 0.007 & 0.327 & 0.011 \\
+Supervised MLP & 0.986 & 0.924 & 0.997 & 0.965 & 0.999 & 0.999 & 0.987 & 0.952 \\
+Tabular Transformer & 0.987 & 0.931 & 0.996 & 0.966 & 0.806 & 0.399 & 0.900 & 0.395 \\
 \bottomrule
 \end{tabular}

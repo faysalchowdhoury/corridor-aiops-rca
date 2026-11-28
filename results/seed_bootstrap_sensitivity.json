@@ -21,9 +21,30 @@
   "composite_clusters": 952,
   "first_seed_matches_benchmark_summary_max_abs_ci_delta": 0.0,
   "verdict_definition": "reference_better: 95% CI of (Transformer - model) above 0; reference_worse: CI below 0; inconclusive: CI contains 0",
+  "effect_size_note": "Percentile intervals from a cluster bootstrap whose minority class is concentrated in relatively few sender clusters can be too narrow or biased when a small number of attacker clusters dominates a metric, and they condition on one fixed set of test senders. Seed-level effect sizes rest on few training seeds, so the standardized effect d_z (mean paired difference divided by its seed standard deviation) is imprecise and undefined when the paired difference has zero variance.",
   "comparisons": {
     "robust_threshold_rules": {
       "delta_f1_cyber_vs_benign": {
+        "effect_size": {
+          "paired_difference_per_seed": [
+            0.2579387052211567,
+            0.2493539905413129,
+            0.24970296731830077,
+            0.25739040716705874,
+            0.25660885487451646
+          ],
+          "mean_paired_difference": 0.25419898502446914,
+          "sd_paired_difference": 0.004291453771505784,
+          "standardized_effect_dz": 59.2337698502752,
+          "fraction_of_replicates_reference_better_per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "fraction_of_replicates_reference_better_mean": 1.0
+        },
         "per_seed": {
           "42": {
             "mean": 0.2594541707709648,
@@ -88,6 +109,26 @@
         "ci_verdict_stable": true
       },
       "delta_auroc": {
+        "effect_size": {
+          "paired_difference_per_seed": [
+            0.20116262363650894,
+            0.19890784678318418,
+            0.19948985514435158,
+            0.20129586566472268,
+            0.20014667754187987
+          ],
+          "mean_paired_difference": 0.20020057375412942,
+          "sd_paired_difference": 0.0010373491590330297,
+          "standardized_effect_dz": 192.99246739713695,
+          "fraction_of_replicates_reference_better_per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "fraction_of_replicates_reference_better_mean": 1.0
+        },
         "per_seed": {
           "42": {
             "mean": 0.20121664826326513,
@@ -154,6 +195,26 @@
     },
     "isolation_forest": {
       "delta_f1_cyber_vs_benign": {
+        "effect_size": {
+          "paired_difference_per_seed": [
+            0.22599515895903632,
+            0.2333136931041634,
+            0.24762298632901314,
+            0.2780063254087364,
+            0.2707472122792598
+          ],
+          "mean_paired_difference": 0.2511370752160418,
+          "sd_paired_difference": 0.022741217014718318,
+          "standardized_effect_dz": 11.043255734884532,
+          "fraction_of_replicates_reference_better_per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "fraction_of_replicates_reference_better_mean": 1.0
+        },
         "per_seed": {
           "42": {
             "mean": 0.22741770911949302,
@@ -218,6 +279,26 @@
         "ci_verdict_stable": true
       },
       "delta_auroc": {
+        "effect_size": {
+          "paired_difference_per_seed": [
+            0.18148288443305716,
+            0.17941846839383546,
+            0.19173139065455702,
+            0.20625320294971938,
+            0.2008114095837481
+          ],
+          "mean_paired_difference": 0.19193947120298344,
+          "sd_paired_difference": 0.011723408451554564,
+          "standardized_effect_dz": 16.372326529110364,
+          "fraction_of_replicates_reference_better_per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "fraction_of_replicates_reference_better_mean": 1.0
+        },
         "per_seed": {
           "42": {
             "mean": 0.1814386380106737,
@@ -284,6 +365,26 @@
     },
     "one_class_svm": {
       "delta_f1_cyber_vs_benign": {
+        "effect_size": {
+          "paired_difference_per_seed": [
+            0.07870162140478143,
+            0.07119214326473478,
+            0.07107755882595956,
+            0.07872157416483594,
+            0.07787626046602913
+          ],
+          "mean_paired_difference": 0.07551383162526817,
+          "sd_paired_difference": 0.004012174988134127,
+          "standardized_effect_dz": 18.821171022848656,
+          "fraction_of_replicates_reference_better_per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "fraction_of_replicates_reference_better_mean": 1.0
+        },
         "per_seed": {
           "42": {
             "mean": 0.0790079311007309,
@@ -348,6 +449,26 @@
         "ci_verdict_stable": true
       },
       "delta_auroc": {
+        "effect_size": {
+          "paired_difference_per_seed": [
+            0.09929787000804446,
+            0.09706594474971741,
+            0.09759171279652934,
+            0.09948413091048558,
+            0.09835798254557537
+          ],
+          "mean_paired_difference": 0.09835952820207043,
+          "sd_paired_difference": 0.0010497758845171524,
+          "standardized_effect_dz": 93.69573987433631,
+          "fraction_of_replicates_reference_better_per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "fraction_of_replicates_reference_better_mean": 1.0
+        },
         "per_seed": {
           "42": {
             "mean": 0.09922530542646778,
@@ -414,6 +535,26 @@
     },
     "lstm_autoencoder": {
       "delta_f1_cyber_vs_benign": {
+        "effect_size": {
+          "paired_difference_per_seed": [
+            0.07307700564831388,
+            0.06464442330820241,
+            0.06406242352147296,
+            0.07198308293306221,
+            0.07093452164751757
+          ],
+          "mean_paired_difference": 0.0689402914117138,
+          "sd_paired_difference": 0.004260164816896251,
+          "standardized_effect_dz": 16.182540905058307,
+          "fraction_of_replicates_reference_better_per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "fraction_of_replicates_reference_better_mean": 1.0
+        },
         "per_seed": {
           "42": {
             "mean": 0.07410026697151256,
@@ -478,6 +619,26 @@
         "ci_verdict_stable": true
       },
       "delta_auroc": {
+        "effect_size": {
+          "paired_difference_per_seed": [
+            0.06146731633056035,
+            0.05951405697843448,
+            0.06008849008120065,
+            0.061702355640121165,
+            0.05970875574164736
+          ],
+          "mean_paired_difference": 0.060496194954392804,
+          "sd_paired_difference": 0.0010184276003059286,
+          "standardized_effect_dz": 59.40156662704366,
+          "fraction_of_replicates_reference_better_per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "fraction_of_replicates_reference_better_mean": 1.0
+        },
         "per_seed": {
           "42": {
             "mean": 0.06176563485610508,
@@ -544,6 +705,26 @@
     },
     "logistic_regression": {
       "delta_f1_cyber_vs_benign": {
+        "effect_size": {
+          "paired_difference_per_seed": [
+            0.012372675474993877,
+            0.0037879607951500915,
+            0.004136937572137955,
+            0.011824377420895926,
+            0.01104282512835364
+          ],
+          "mean_paired_difference": 0.008632955278306298,
+          "sd_paired_difference": 0.004291453771505784,
+          "standardized_effect_dz": 2.0116621867459075,
+          "fraction_of_replicates_reference_better_per_seed": [
+            1.0,
+            0.87,
+            0.845,
+            0.997,
+            0.998
+          ],
+          "fraction_of_replicates_reference_better_mean": 0.942
+        },
         "per_seed": {
           "42": {
             "mean": 0.012316678758515907,
@@ -608,6 +789,26 @@
         "ci_verdict_stable": false
       },
       "delta_auroc": {
+        "effect_size": {
+          "paired_difference_per_seed": [
+            0.005214076541712354,
+            0.0029592996883875955,
+            0.003541308049554992,
+            0.005347318569926096,
+            0.004198130447083281
+          ],
+          "mean_paired_difference": 0.004252026659332863,
+          "sd_paired_difference": 0.0010373491590330295,
+          "standardized_effect_dz": 4.09893488832286,
+          "fraction_of_replicates_reference_better_per_seed": [
+            1.0,
+            0.999,
+            0.998,
+            1.0,
+            1.0
+          ],
+          "fraction_of_replicates_reference_better_mean": 0.9994
+        },
         "per_seed": {
           "42": {
             "mean": 0.005187313035070457,
@@ -674,6 +875,26 @@
     },
     "random_forest": {
       "delta_f1_cyber_vs_benign": {
+        "effect_size": {
+          "paired_difference_per_seed": [
+            -0.014168175087909574,
+            -0.02027230843111294,
+            -0.02317417607677108,
+            -0.012741896688359233,
+            -0.013120344170647114
+          ],
+          "mean_paired_difference": -0.01669538009095999,
+          "sd_paired_difference": 0.004731989321362668,
+          "standardized_effect_dz": -3.5281947944363132,
+          "fraction_of_replicates_reference_better_per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "fraction_of_replicates_reference_better_mean": 0.0
+        },
         "per_seed": {
           "42": {
             "mean": -0.014306013285923234,
@@ -738,6 +959,26 @@
         "ci_verdict_stable": true
       },
       "delta_auroc": {
+        "effect_size": {
+          "paired_difference_per_seed": [
+            -0.002286672737830675,
+            -0.004719410921246392,
+            -0.003935410782867299,
+            -0.0022871873521226327,
+            -0.00342565812225204
+          ],
+          "mean_paired_difference": -0.0033308679832638076,
+          "sd_paired_difference": 0.0010585510885200043,
+          "standardized_effect_dz": -3.1466294063527966,
+          "fraction_of_replicates_reference_better_per_seed": [
+            0.001,
+            0.0,
+            0.0,
+            0.002,
+            0.0
+          ],
+          "fraction_of_replicates_reference_better_mean": 0.0006000000000000001
+        },
         "per_seed": {
           "42": {
             "mean": -0.0022892484852599228,
@@ -804,6 +1045,26 @@
     },
     "hist_gradient_boosting": {
       "delta_f1_cyber_vs_benign": {
+        "effect_size": {
+          "paired_difference_per_seed": [
+            -0.009877468943829237,
+            -0.018462183623673023,
+            -0.01811320684668516,
+            -0.010425766997927188,
+            -0.011207319290469475
+          ],
+          "mean_paired_difference": -0.013617189140516817,
+          "sd_paired_difference": 0.004291453771505784,
+          "standardized_effect_dz": -3.173094682023994,
+          "fraction_of_replicates_reference_better_per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.001,
+            0.0
+          ],
+          "fraction_of_replicates_reference_better_mean": 0.0002
+        },
         "per_seed": {
           "42": {
             "mean": -0.009961853004693294,
@@ -868,6 +1129,26 @@
         "ci_verdict_stable": true
       },
       "delta_auroc": {
+        "effect_size": {
+          "paired_difference_per_seed": [
+            -0.0022594049814187445,
+            -0.0045141818347435025,
+            -0.003932173473576106,
+            -0.002126162953205002,
+            -0.0032753510760478166
+          ],
+          "mean_paired_difference": -0.0032214548637982342,
+          "sd_paired_difference": 0.0010373491590330295,
+          "standardized_effect_dz": -3.1054682367517707,
+          "fraction_of_replicates_reference_better_per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.003,
+            0.0
+          ],
+          "fraction_of_replicates_reference_better_mean": 0.0006000000000000001
+        },
         "per_seed": {
           "42": {
             "mean": -0.0022790674261595704,
@@ -934,6 +1215,26 @@
     },
     "supervised_mlp": {
       "delta_f1_cyber_vs_benign": {
+        "effect_size": {
+          "paired_difference_per_seed": [
+            0.013754662272211005,
+            0.001005028684623932,
+            -0.0006166589341184414,
+            0.0013740905177928031,
+            0.013248322811008406
+          ],
+          "mean_paired_difference": 0.005753089070303541,
+          "sd_paired_difference": 0.0071150737508839865,
+          "standardized_effect_dz": 0.8085775737164733,
+          "fraction_of_replicates_reference_better_per_seed": [
+            1.0,
+            0.74,
+            0.366,
+            0.76,
+            1.0
+          ],
+          "fraction_of_replicates_reference_better_mean": 0.7731999999999999
+        },
         "per_seed": {
           "42": {
             "mean": 0.013869633502802677,
@@ -998,6 +1299,26 @@
         "ci_verdict_stable": false
       },
       "delta_auroc": {
+        "effect_size": {
+          "paired_difference_per_seed": [
+            0.002589464306131717,
+            -4.5493490338888165e-05,
+            -0.00016538841879576438,
+            0.0018398549114148066,
+            0.0010815741525245226
+          ],
+          "mean_paired_difference": 0.0010600022921872787,
+          "sd_paired_difference": 0.0011907553091126753,
+          "standardized_effect_dz": 0.8901932110444833,
+          "fraction_of_replicates_reference_better_per_seed": [
+            1.0,
+            0.42,
+            0.384,
+            0.998,
+            0.959
+          ],
+          "fraction_of_replicates_reference_better_mean": 0.7522
+        },
         "per_seed": {
           "42": {
             "mean": 0.002567684911276037,
@@ -2449,7 +2770,7 @@
   },
   "scores": {
     "scores_file": "scores/per_seed_scores.npz",
-    "scores_sha256": "472e76af86f40147535a3ca12c042bcfee3fdd9648da014e71bc88678034f319",
+    "scores_sha256": "1757f660e63246114b93024def8cdb96e7f7307d6609d7318219419da46849e1",
     "tolerance": 1e-06,
     "verification_against_benchmark_summary": {
       "official": {
@@ -2462,14 +2783,14 @@
       "loao:dataReplay->dosAttack": {
         "per_seed_metric_values_compared": 765,
         "values_over_tolerance": 0,
-        "max_abs_delta": 1.8078884944650042e-08,
+        "max_abs_delta": 8.281143659694123e-09,
         "checkpoint_hashes_matched": 45,
         "checkpoint_hashes_compared": 45
       },
       "loao:dosAttack->dataReplay": {
         "per_seed_metric_values_compared": 765,
         "values_over_tolerance": 0,
-        "max_abs_delta": 2.7755575615628914e-17,
+        "max_abs_delta": 1.1102230246251565e-16,
         "checkpoint_hashes_matched": 45,
         "checkpoint_hashes_compared": 45
       }

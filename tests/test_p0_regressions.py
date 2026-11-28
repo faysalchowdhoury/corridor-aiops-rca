@@ -433,3 +433,184 @@ def test_graph_labels_attach_separately_for_supervised_training() -> None:
     assert labeled_graph[0].adjacency == unlabeled_graph[0].adjacency
     assert labeled_graph[0].member_event_ids == unlabeled_graph[0].member_event_ids
     assert attach_attacker_labels(unlabeled_graph, events) == [(True, False)]
+
+
+# ---------------------------------------------------------------------------
+# Leakage and determinism audits (second-round review, P0.3)
+# ---------------------------------------------------------------------------
+
+
+def _tie_bsm(
+    event_id: str, source_id: str, nanos: int, x: float, *, broadcast: str | None = None
+) -> CorridorEvent:
+    return CorridorEvent(
+        event_id=event_id,
+        timestamp=datetime(2022, 1, 1, tzinfo=timezone.utc),
+        corridor_id="trace",
+        source_id=source_id,
+        kind=EventKind.BSM,
+        label="benign",
+        metrics={
+            "position_x": x,
+            "position_y": 0.0,
+            "position_z": 0.0,
+            "position_xy_valid": 1.0,
+            "position_z_valid": 1.0,
+            "speed": 10.0 + x / 100.0,
+            "speed_valid": 1.0,
+            "acceleration": 0.0,
+            "acceleration_valid": 1.0,
+            "heading": 0.0,
+            "heading_valid": 1.0,
+        },
+        broadcast_id=broadcast,
+        receive_time_ns=nanos,
+    )
+
+
+def _features_by_event(events: list[CorridorEvent]) -> dict[str, tuple]:
+    from corridor_aiops.data.trajectory import extract_trajectory_windows
+
+    return {
+        window.event.event_id: (window.values, window.feature_mask)
+        for window in extract_trajectory_windows(events)
+    }
+
+
+def test_local_density_is_invariant_to_input_permutation_under_timestamp_ties() -> None:
+    # four senders share one nanosecond timestamp; two of them also share a later one
+    events = [
+        _tie_bsm("e1", "veh_a", 1_000, 0.0, broadcast="veh_a:1:1"),
+        _tie_bsm("e2", "veh_b", 1_000, 10.0, broadcast="veh_b:1:1"),
+        _tie_bsm("e3", "veh_c", 1_000, 20.0, broadcast="veh_c:1:1"),
+        _tie_bsm("e4", "veh_d", 1_000, 400.0, broadcast="veh_d:1:1"),
+        _tie_bsm("e5", "veh_a", 2_000, 1.0, broadcast="veh_a:2:2"),
+        _tie_bsm("e6", "veh_b", 2_000, 11.0, broadcast="veh_b:2:2"),
+    ]
+    reference = _features_by_event(events)
+    rng = np.random.default_rng(7)
+    for _ in range(10):
+        permuted = [events[i] for i in rng.permutation(len(events))]
+        assert _features_by_event(permuted) == reference
+
+
+def test_future_events_do_not_change_past_windows() -> None:
+    past = [
+        _tie_bsm(f"p{i}", sender, 1_000_000 * i, 5.0 * i + offset)
+        for i in range(1, 6)
+        for sender, offset in (("veh_a", 0.0), ("veh_b", 30.0))
+    ]
+    future = [
+        _tie_bsm(f"f{i}", sender, 1_000_000 * (10 + i), 5.0 * i + offset)
+        for i in range(1, 4)
+        for sender, offset in (("veh_a", 0.0), ("veh_b", 30.0))
+    ]
+    mutated = [
+        _tie_bsm(event.event_id, event.source_id, event.receive_time_ns, 9_999.0)
+        for event in future
+    ]
+
+    original = _features_by_event(past + future)
+    changed = _features_by_event(past + mutated)
+
+    for event in past:
+        assert original[event.event_id] == changed[event.event_id]
+    assert any(original[e.event_id] != changed[e.event_id] for e in future)
+
+
+def test_parser_keeps_earliest_receive_time_across_receiver_copies(tmp_path) -> None:
+    broadcast = {
+        "sendTime": 900_000_000,
+        "sender_id": "veh_1",
+        "messageID": 7,
+        "attacker": 0,
+        "sender": {"pos": "5.0,0.0,0.0", "spd": 10.0, "acl": 0.0, "hed": 0.0},
+    }
+    outer_buffer = io.BytesIO()
+    with zipfile.ZipFile(outer_buffer, "w") as outer:
+        inner_buffer = io.BytesIO()
+        with zipfile.ZipFile(inner_buffer, "w") as inner:
+            # three receivers heard the same broadcast; the earliest copy is in the middle
+            inner.writestr("a_receiver.json", json.dumps([{**broadcast, "rcvTime": 1_000_500}]))
+            inner.writestr("b_receiver.json", json.dumps([{**broadcast, "rcvTime": 1_000_100}]))
+            inner.writestr("c_receiver.json", json.dumps([{**broadcast, "rcvTime": 1_000_900}]))
+        outer.writestr("S_dataReplay/Train/S_dataReplay.zip", inner_buffer.getvalue())
+    path = tmp_path / "S_dataReplay.zip"
+    path.write_bytes(outer_buffer.getvalue())
+
+    events = list(veremi_events(path))
+
+    assert len(events) == 1
+    assert events[0].receive_time_ns == 1_000_100
+    assert events[0].broadcast_id == "veh_1:7:900000000"
+
+
+@pytest.mark.parametrize("protocol", ["loao", "heldout"])
+def test_normalization_and_thresholds_ignore_target_records(protocol: str) -> None:
+    from types import SimpleNamespace
+
+    from corridor_aiops.data.trajectory import FEATURE_NAMES
+    from corridor_aiops.evaluation.benchmark import FULL_CONFIG, EventTable, run_models
+
+    rng = np.random.default_rng(3)
+    per_group = 60
+    groups = (
+        [("dataReplay", "train"), ("dataReplay", "validation"), ("dosAttack", "test")]
+        if protocol == "loao"
+        else [("highway", "train"), ("highway", "validation"), ("urban", "test")]
+    )
+    archive, split, labels = [], [], []
+    for name, part in groups:
+        archive += [name] * per_group
+        split += [part] * per_group
+        labels += [int(i % 4 == 0) for i in range(per_group)]
+    count = len(labels)
+    values = rng.normal(size=(count, 10, len(FEATURE_NAMES))).astype(np.float32)
+    values[np.asarray(labels) == 1] += 1.5
+
+    def table(array: np.ndarray, test_labels: np.ndarray) -> EventTable:
+        all_labels = np.asarray(labels, dtype=np.int64).copy()
+        all_labels[-per_group:] = test_labels
+        return EventTable(
+            events=[SimpleNamespace() for _ in range(count)],
+            values=array,
+            feature_mask=np.ones((count, 10, len(FEATURE_NAMES)), dtype=bool),
+            step_mask=np.ones((count, 10), dtype=bool),
+            labels=all_labels,
+            corridor=np.asarray([f"{a}-{s}" for a, s in zip(archive, split, strict=True)]),
+            source=np.asarray([f"veh_{i % 15}" for i in range(count)]),
+            archive=np.asarray(archive),
+            split=np.asarray(split),
+            feature_names=FEATURE_NAMES,
+        )
+
+    split_rows = {
+        "train": np.arange(0, per_group),
+        "validation": np.arange(per_group, 2 * per_group),
+        "test": np.arange(2 * per_group, 3 * per_group),
+    }
+    original_labels = np.asarray(labels[-per_group:])
+    mutated = values.copy()
+    mutated[split_rows["test"]] = rng.normal(50.0, 20.0, size=mutated[split_rows["test"]].shape)
+
+    def run(array: np.ndarray, test_labels: np.ndarray):
+        return run_models(
+            table(array, test_labels),
+            split_rows,
+            ["logistic_regression", "isolation_forest"],
+            config=FULL_CONFIG,
+            seeds=[42],
+            epochs=1,
+            label="isolation test",
+        )
+
+    base_summary, _, base_rep = run(values, original_labels)
+    new_summary, _, new_rep = run(mutated, 1 - original_labels)
+
+    np.testing.assert_array_equal(base_rep.medians, new_rep.medians)
+    np.testing.assert_array_equal(base_rep.scales, new_rep.scales)
+    for name in base_summary:
+        old = base_summary[name]["per_seed"][0]
+        new = new_summary[name]["per_seed"][0]
+        for key in ("validation_f1_threshold", "validation_auroc", "checkpoint_sha256"):
+            assert old[key] == new[key], (name, key)

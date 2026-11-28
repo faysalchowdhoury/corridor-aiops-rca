@@ -106,6 +106,21 @@ def _event_time_ns(event: CorridorEvent) -> int:
     return _position_time_ns(event.timestamp)
 
 
+def _tie_break_key(event: CorridorEvent) -> tuple[str, int, str, str]:
+    """Deterministic event order that never depends on input list order.
+
+    Events with identical nanosecond receive times are ordered by broadcast identity and
+    then by event_id. Two events that agree on every component are content-identical
+    receive records, so their relative order cannot change any feature value.
+    """
+    return (
+        event.corridor_id,
+        _event_time_ns(event),
+        event.broadcast_id or "",
+        event.event_id,
+    )
+
+
 def _local_densities(
     events: list[CorridorEvent],
     *,
@@ -116,15 +131,7 @@ def _local_densities(
     cell_width = radius_meters
     densities = [0.0] * len(events)
     valid = [False] * len(events)
-    ordered = sorted(
-        enumerate(events),
-        key=lambda item: (
-            item[1].corridor_id,
-            _event_time_ns(item[1]),
-            item[1].event_id,
-            item[0],
-        ),
-    )
+    ordered = sorted(enumerate(events), key=lambda item: _tie_break_key(item[1]))
     corridor_id: str | None = None
     active: dict[str, tuple[int, float, float, tuple[int, int]]] = {}
     cells: dict[tuple[int, int], set[str]] = defaultdict(set)
@@ -232,13 +239,7 @@ def extract_trajectory_windows(
     output: list[TrajectoryWindow | None] = [None] * len(event_list)
     max_gap_seconds = float(max_gap_seconds)
     for indices in tracks.values():
-        indices.sort(
-            key=lambda index: (
-                _event_time_ns(event_list[index]),
-                event_list[index].event_id,
-                index,
-            )
-        )
+        indices.sort(key=lambda index: _tie_break_key(event_list[index]))
         history: deque[tuple[tuple[float, ...], tuple[bool, ...]]] = deque(maxlen=window_size)
         prior_interval_sum = 0.0
         prior_interval_count = 0

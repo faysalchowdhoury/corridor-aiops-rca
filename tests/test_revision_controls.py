@@ -248,3 +248,228 @@ def test_procedure_thresholds_respect_their_definitions() -> None:
     assert np.isfinite(max_f1) and np.isfinite(youden)
     with pytest.raises(ValueError, match="Unknown threshold procedure"):
         procedure_threshold("median", labels, scores)
+
+
+# second-round review controls -------------------------------------------------
+
+
+def _sequence_split(rng: np.random.Generator, labels: list[int]):
+    from corridor_aiops.evaluation.sequence_models import SequenceSplit
+
+    count = len(labels)
+    values = rng.normal(size=(count, 10, 4)).astype(np.float32)
+    values[np.asarray(labels) == 1] += 2.0
+    return SequenceSplit(
+        values,
+        np.ones((count, 10, 4), dtype=bool),
+        np.ones((count, 10), dtype=bool),
+        np.asarray(labels, dtype=np.int64),
+    )
+
+
+def test_label_free_autoencoder_checkpoint_ignores_attacker_validation_records() -> None:
+    from dataclasses import replace
+
+    from corridor_aiops.evaluation.sequence_models import fit_lstm_autoencoder
+
+    rng = np.random.default_rng(11)
+    train = _sequence_split(rng, [0] * 48 + [1] * 8)
+    validation = _sequence_split(rng, [0] * 24 + [1] * 8)
+    test = _sequence_split(rng, [0] * 16 + [1] * 4)
+    attackers = validation.labels == 1
+    scrambled_values = validation.values.copy()
+    scrambled_values[attackers] = rng.normal(9.0, 3.0, size=scrambled_values[attackers].shape)
+    scrambled = replace(validation, values=scrambled_values)
+
+    first = fit_lstm_autoencoder(
+        train, validation, test, epochs=3, seed=5, selection_metric="benign_reconstruction_loss"
+    )
+    second = fit_lstm_autoencoder(
+        train, scrambled, test, epochs=3, seed=5, selection_metric="benign_reconstruction_loss"
+    )
+
+    assert first["checkpoint_sha256"] == second["checkpoint_sha256"]
+    assert first["selected_epoch"] == second["selected_epoch"]
+    assert "selected_validation_auroc" not in first
+    assert first["training_status"].startswith("benign_only_training_with_label_free")
+
+
+def test_main_autoencoder_is_documented_as_auroc_selected() -> None:
+    from corridor_aiops.evaluation.benchmark import AE_LABEL_FREE_MODEL
+    from corridor_aiops.evaluation.sequence_models import fit_lstm_autoencoder
+
+    rng = np.random.default_rng(12)
+    result = fit_lstm_autoencoder(
+        _sequence_split(rng, [0] * 32 + [1] * 4),
+        _sequence_split(rng, [0] * 16 + [1] * 4),
+        _sequence_split(rng, [0] * 8 + [1] * 2),
+        epochs=2,
+        seed=1,
+    )
+
+    assert result["training_status"] == "benign_only_training_with_validation_auroc_selection"
+    assert "selected_validation_auroc" in result
+    assert regime(AE_LABEL_FREE_MODEL) == "unsupervised_or_one_class"
+
+
+def test_unknown_selection_metric_is_rejected() -> None:
+    from corridor_aiops.evaluation.sequence_models import fit_lstm_autoencoder
+
+    rng = np.random.default_rng(13)
+    split = _sequence_split(rng, [0] * 8 + [1] * 2)
+    with pytest.raises(ValueError, match="selection_metric"):
+        fit_lstm_autoencoder(split, split, split, epochs=1, seed=1, selection_metric="test_auroc")
+
+
+def test_label_granularity_groups_split_message_and_sender_level_records() -> None:
+    from corridor_aiops.evaluation.sensitivity import _group_metrics
+
+    labels = np.asarray([0, 0, 0, 0, 1, 1, 1, 1])
+    outcomes = np.asarray(
+        ["benign"] * 4
+        + [
+            "attacker_payload_differs",
+            "attacker_no_ground_truth",
+            "attacker_payload_matches",
+            "attacker_payload_matches",
+        ]
+    )
+    scores = np.asarray([0.1, 0.2, 0.3, 0.4, 0.9, 0.8, 0.35, 0.05])
+
+    out = _group_metrics(labels, outcomes, scores, threshold=0.5)
+
+    assert out["message_corroborated|count"] == 2
+    assert out["sender_level_genuine_state|count"] == 2
+    assert out["message_corroborated|recall"] == 1.0
+    assert out["sender_level_genuine_state|recall"] == 0.0
+    assert out["message_corroborated|auroc_vs_all_non_malicious"] == 1.0
+    assert out["sender_level_genuine_state|auroc_vs_all_non_malicious"] == pytest.approx(0.375)
+
+
+def test_seed_effect_size_uses_paired_seed_differences() -> None:
+    from corridor_aiops.evaluation.sensitivity import seed_effect_size
+
+    summary = {
+        "models": {
+            "tabular_transformer": {"per_seed": [{"auroc": v} for v in (0.90, 0.92, 0.94)]},
+            "random_forest": {"per_seed": [{"auroc": v} for v in (0.95, 0.95, 0.95)]},
+        }
+    }
+    rows = [{"fraction_of_replicates_reference_better": f} for f in (0.0, 0.1, 0.2)]
+
+    effect = seed_effect_size(summary, "random_forest", "delta_auroc", rows)
+
+    assert effect["mean_paired_difference"] == pytest.approx(-0.03)
+    assert effect["sd_paired_difference"] == pytest.approx(0.02)
+    assert effect["standardized_effect_dz"] == pytest.approx(-1.5)
+    assert effect["fraction_of_replicates_reference_better_mean"] == pytest.approx(0.1)
+
+
+def test_seed_effect_size_is_undefined_without_seed_variance() -> None:
+    from corridor_aiops.evaluation.sensitivity import seed_effect_size
+
+    summary = {
+        "models": {
+            "tabular_transformer": {"per_seed": [{"auroc": 0.9}, {"auroc": 0.9}]},
+            "logistic_regression": {"per_seed": [{"auroc": 0.8}, {"auroc": 0.8}]},
+        }
+    }
+    rows = [{"fraction_of_replicates_reference_better": 1.0}] * 2
+
+    effect = seed_effect_size(summary, "logistic_regression", "delta_auroc", rows)
+
+    assert effect["standardized_effect_dz"] is None
+
+
+def test_sender_overlap_breakdown_separates_seen_and_unseen_test_senders() -> None:
+    from corridor_aiops.evaluation.sensitivity import sender_overlap_breakdown
+
+    table = _two_archive_table()
+    # make veh_0..veh_5 the only training senders, so veh_6..veh_11 are unseen in test
+    sources = table.source.copy()
+    train = table.split == "train"
+    sources[train] = np.asarray([f"veh_{i % 6}" for i in range(int(train.sum()))])
+    table = EventTable(**{**table.__dict__, "source": sources})
+    test = table.rows(split="test")
+    scores = {"official|rows|test": test, "official|model|42|test": table.labels[test] * 0.9}
+
+    class Stub:
+        def rows(self, context, split):
+            return scores[f"{context}|rows|{split}"]
+
+        def get(self, context, model, seed, split):
+            return scores[f"{context}|{model}|{seed}|{split}"]
+
+    ms = {"mean": 0.5, "std": 0.0}
+    summary = {
+        "protocol": {"training_seeds": [42]},
+        "models": {"model": {"per_seed": [{"validation_f1_threshold": 0.5}]}},
+        "generalization": {
+            "sender_disjoint_holdout": {
+                "models": {
+                    "model": {
+                        "mean_std_across_training_seeds": {
+                            "auroc": ms,
+                            "f1_cyber_vs_benign": ms,
+                            "false_alarm_rate_non_malicious": ms,
+                        }
+                    }
+                }
+            }
+        },
+    }
+
+    out = sender_overlap_breakdown(table, summary, Stub())
+
+    for archive in ("dataReplay", "dosAttack"):
+        counts = out["counts_by_archive"][archive]
+        assert counts["seen"]["senders"] == 6
+        assert counts["unseen"]["senders"] == 6
+        assert counts["seen"]["messages"] + counts["unseen"]["messages"] == 24
+    seen = out["models"]["model"]["seen"]["mean_std"]
+    assert seen["recall"]["mean"] == 1.0
+    assert seen["false_alarm_rate"]["mean"] == 0.0
+
+
+def test_new_sensitivity_tables_render_for_official_and_loao_contexts() -> None:
+    from corridor_aiops.evaluation.sensitivity import (
+        _label_granularity_table,
+        _sender_overlap_table,
+    )
+
+    ms = {"mean": 0.5, "std": 0.0}
+    group_stats = {
+        f"{g}|{m}": ms
+        for g in ("message_corroborated", "sender_level_genuine_state")
+        for m in ("recall", "auroc_vs_all_non_malicious")
+    }
+    models = {
+        "isolation_forest": {
+            "supervision_regime": "unsupervised_or_one_class",
+            "display_name": "IF",
+        },
+        "random_forest": {"supervision_regime": "supervised", "display_name": "RF"},
+    }
+    summary = {"models": models}
+    context = {"models": {n: {"mean_std": group_stats} for n in models}}
+    seen = {"mean_std": {"auroc": ms, "recall": ms, "false_alarm_rate": ms}}
+    diagnostics = {
+        "label_granularity": {
+            "contexts": {"official": context, "loao:dataReplay->dosAttack": context}
+        },
+        "sender_overlap": {
+            "models": {n: {"seen": seen, "unseen": seen} for n in models},
+            "sender_disjoint_holdout_all_models": {
+                n: {"auroc": ms, "f1_cyber_vs_benign": ms, "false_alarm_rate_non_malicious": ms}
+                for n in models
+            },
+        },
+    }
+
+    granularity = "\n".join(_label_granularity_table(summary, diagnostics))
+    overlap = "\n".join(_sender_overlap_table(summary, diagnostics))
+
+    assert "Pooled official test" in granularity
+    assert "LOAO dataReplay" in granularity
+    assert granularity.count("0.500") == 16
+    assert overlap.count("RF &") == 1

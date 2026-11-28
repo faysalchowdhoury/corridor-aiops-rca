@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "evidence_source": "results/dataset_capability_matrix.json",
-  "dataset_capability_matrix_sha256": "74720e2560e62889c1caf4f70f66d4a439c60d4e6a759852d3fd57e675aa33a1",
+  "dataset_capability_matrix_sha256": "22ab21856e111977787d292833384509ba29309f9dede3f5773f339e5a629fcc",
   "scope": "Eligibility reflects available labels and input modalities only. It does not imply that a model is trained, benchmarked, or validated.",
   "models": [
     {
@@ -74,7 +74,7 @@
       "input": "causal_sequences",
       "inputs_available_in_veremi": true,
       "emitter_scoring": "aggregate_event_anomaly_scores_by_sender",
-      "training_status": "trained_on_non_malicious_training_sequences",
+      "training_status": "benign_only_training_with_validation_auroc_selection",
       "evaluation_status": "evaluated_on_official_veremi_splits",
       "data_task_eligibility": {
         "track_a1_detection": "DATA_ELIGIBLE",
@@ -279,5 +279,5 @@
     "work_zone_false_alarm_rate": "Not evaluable without time-aligned work-zone and traffic observations.",
     "track_b_cross_modal_fusion": "Not evaluable without temporally and spatially aligned modalities."
   },
-  "benchmark_summary_sha256": "f1721fb0741fbd51069b9ed06691a9cfa48dffff759882be3162925e430aaaf6"
+  "benchmark_summary_sha256": "62faed458c7f0a98a476a8115ecf9b43f1c1c801c192dc7de01f865c5a1f40c7"
 }

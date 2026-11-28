@@ -59,19 +59,25 @@ def render(results: Path) -> str:
         f"### Headline results (official test split, {len(summary['protocol']['training_seeds'])}"
         " training seeds)",
         "",
-        "| Regime | Model | F1 | AUROC | TPR at FAR 1% |",
-        "|---|---|---|---|---|",
+        "| Regime | Model | F1 | AUROC | Val.-calibrated recall, 1% budget "
+        "(realized test FAR) | Test ROC TPR at FAR 1% (retrospective) |",
+        "|---|---|---|---|---|---|",
     ]
     for name, block in models.items():
         regime = "Supervised" if name in supervised else "Unsupervised / one-class"
+        calibrated = _mean(block, "validation_calibrated_recall_at_far_1.0pct")
+        realized = 100 * _mean(block, "validation_calibrated_realized_far_at_far_1.0pct")
         lines.append(
             f"| {regime} | {block['display_name']} | {_ms(block, 'f1_cyber_vs_benign')} | "
-            f"{_ms(block, 'auroc')} | {_mean(block, 'test_roc_tpr_at_far_1.0pct'):.3f} |"
+            f"{_ms(block, 'auroc')} | {calibrated:.3f} ({realized:.2f}%) | "
+            f"{_mean(block, 'test_roc_tpr_at_far_1.0pct'):.3f} |"
         )
     lines += [
         "",
-        "Values are mean ± sample standard deviation over training seeds; TPR is read from the "
-        "test ROC at 1% FPR (a retrospective diagnostic, not a deployable operating point).",
+        "Values are mean ± sample standard deviation (or seed means) over training seeds. The "
+        "primary operational metric is validation-calibrated recall with its realized test "
+        "false-alarm rate; the test ROC TPR at 1% FPR places the threshold with test scores "
+        "and is a retrospective curve diagnostic, not an achievable operating point.",
         "",
     ]
     bullets: list[str] = []
@@ -197,6 +203,57 @@ def render(results: Path) -> str:
                 "`results/results_threshold_procedures.tex`."
             )
 
+        overlap = diagnostics.get("sender_overlap")
+        if overlap:
+            counts = overlap["counts_by_archive"].values()
+            seen = sum(block["seen"]["senders"] for block in counts)
+            unseen = sum(block["unseen"]["senders"] for block in counts)
+            gaps = [
+                overlap["models"][n]["seen"]["mean_std"]["auroc"]["mean"]
+                - overlap["models"][n]["unseen"]["mean_std"]["auroc"]["mean"]
+                for n in supervised
+            ]
+            bullets.append(
+                f"**Seen versus unseen senders:** {seen} official test senders also occur in "
+                f"the official training split and {unseen} do not, so official-split scores are "
+                "not sender-independent; supervised AUROC on seen minus unseen senders ranges "
+                f"from {min(gaps):+.3f} to {max(gaps):+.3f} "
+                "(`results/results_sender_overlap.tex`)."
+            )
+        granularity = diagnostics.get("label_granularity")
+        if granularity:
+            official = granularity["contexts"]["official"]
+            sender_level = [
+                official["models"][n]["mean_std"]["sender_level_genuine_state|recall"]["mean"]
+                for n in supervised
+            ]
+            bullets.append(
+                "**Message-corroborated versus sender-level labels:** "
+                f"{_count(official['group_counts']['message_corroborated'])} official test "
+                "attacker records are corroborated by their payload and "
+                f"{_count(official['group_counts']['sender_level_genuine_state'])} carry the "
+                "genuine sender state and are labeled at sender level; supervised recall on the "
+                f"sender-level group is {min(sender_level):.3f} to {max(sender_level):.3f}, "
+                "obtained from window context rather than payload falsification."
+            )
+
+    sensitivity_block = _load(results, "seed_bootstrap_sensitivity.json")
+    if sensitivity_block and "effect_size_note" in sensitivity_block:
+        rf = sensitivity_block["comparisons"].get("random_forest", {}).get("delta_auroc")
+        if rf:
+            effect = rf["effect_size"]
+            dz = effect["standardized_effect_dz"]
+            bullets.append(
+                "**Effect sizes:** Tabular Transformer minus random forest AUROC averages "
+                f"{effect['mean_paired_difference']:+.3f} over seeds (d_z "
+                f"{'undefined' if dz is None else f'{dz:+.1f}'}); the fraction of bootstrap "
+                "replicates favoring the Transformer averages "
+                f"{effect['fraction_of_replicates_reference_better_mean']:.2f}. Percentile "
+                "cluster-bootstrap intervals on imbalanced clustered data and "
+                f"{len(summary['protocol']['training_seeds'])}-seed effect sizes are "
+                "approximate."
+            )
+
     for key, title in (
         ("sender_disjoint_holdout", "Sender-disjoint holdout"),
         ("chronological_holdout", "Chronological holdout"),
@@ -215,6 +272,19 @@ def render(results: Path) -> str:
             base = models[result["compared_with"]]["display_name"]
             parts.append(f"{base} {full:.3f} (L = 1) versus {variant:.3f} (L = 10)")
         bullets.append("**Matched L = 10 one-class controls:** AUROC " + "; ".join(parts) + ".")
+    if ablation and "autoencoder_checkpoint_selection" in ablation["ablations"]:
+        block = ablation["ablations"]["autoencoder_checkpoint_selection"]["models"]
+        result = next(iter(block.values()))
+        variant = result["variant_mean_std_across_training_seeds"]
+        full = result["full_mean_std_across_training_seeds"]
+        bullets.append(
+            "**Label-free autoencoder checkpoint:** the main LSTM autoencoder trains on "
+            "non-malicious sequences but selects its checkpoint by validation AUROC (attacker "
+            "labels); selecting by benign validation reconstruction error instead gives AUROC "
+            f"{variant['auroc']['mean']:.3f} versus {full['auroc']['mean']:.3f} and F1 "
+            f"{variant['f1_cyber_vs_benign']['mean']:.3f} versus "
+            f"{full['f1_cyber_vs_benign']['mean']:.3f}."
+        )
 
     heldout = _load(results, "heldout_scenario.json")
     if heldout:
