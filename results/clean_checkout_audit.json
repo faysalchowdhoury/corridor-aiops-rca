@@ -1,8 +1,8 @@
 {
-  "generated_at_utc": "2026-11-27T21:47:00.097544+00:00",
+  "generated_at_utc": "2026-11-28T03:06:25.912632+00:00",
   "procedure": "git clone of the committed repository into a temporary directory; official-split benchmark rerun from the clone (PYTHONPATH set to the clone's src); per-seed headline metrics compared with the committed results; ruff and pytest run on Linux (WSL) from a separate clone of the same commit",
-  "commit": "d54fc6d97a82470d0fe1bcb4d7595fe4f0e16005",
-  "linux_commit": "d54fc6d97a82470d0fe1bcb4d7595fe4f0e16005",
+  "commit": "822b3ec7780731cae38156e169d72305091a708d",
+  "linux_commit": "822b3ec7780731cae38156e169d72305091a708d",
   "clone_dir": "temporary git clone (scratch directory, deleted after the audit)",
   "command": "PYTHONPATH=<clone>/src python -m corridor_aiops.evaluation.benchmark --train-seeds 5 --bootstrap-samples 1000 --bootstrap-preview-rows 20 --epochs 5 --skip-generalization --skip-ablations",
   "models": 9,
@@ -43,9 +43,9 @@
       "command": "pytest",
       "exit_code": 0,
       "status": "PASSED",
-      "summary_line": "93 passed in 8.52s"
+      "summary_line": "106 passed in 20.77s"
     }
   },
   "scope_note": "Covers the official-split headline comparison only; generalization and ablation contexts are covered by results/reproduction_audit.json. Not a bit-identical determinism claim.",
-  "code_difference_between_commits": "the audited commit d54fc6d is followed by one commit that records this audit; benchmark, model, and data code is identical between them (git diff d54fc6d -- src/corridor_aiops/data src/corridor_aiops/models src/corridor_aiops/evaluation/benchmark.py is empty); the later commit changes manuscript prose, regenerated documents, and one figure column label in src/corridor_aiops/evaluation/figures.py"
+  "code_difference_between_commits": "the audited commit 822b3ec is followed by one commit that records this audit; no source code changes between them (git diff 822b3ec -- src tests is empty); the later commit changes only this audit, its macros, the regenerated README block, and the rebuilt manuscript files"
 }

@@ -103,7 +103,7 @@ Values are mean ± sample standard deviation (or seed means) over training seeds
 * **Held-out scenario `InTAS_urban_2`** (275,813 test messages, nothing fit or selected on it): random forest AUROC 0.996, Tabular Transformer 0.993; Transformer FAR at its transferred threshold 5.04% versus 3.82% on highway 2. Same attacks and simulator, so this is scenario transfer.
 * **Sender ranking (negative result):** attacker-emitter recall at k = 3 is at most 1.58%, so message-level detection does not provide reliable source localization.
 * **Second-run reproduction:** NOT_BIT_IDENTICAL; 40 of 59,121 numeric values differed (maximum 9.2e-06).
-* **Clean checkout** (commit `d54fc6d`): 360 per-seed headline values, status REPRODUCED_WITHIN_TOLERANCE; Linux `ruff` PASSED, `pytest` PASSED (93 passed in 8.52s).
+* **Clean checkout** (commit `822b3ec`): 360 per-seed headline values, status REPRODUCED_WITHIN_TOLERANCE; Linux `ruff` PASSED, `pytest` PASSED (106 passed in 20.77s).
 
 <!-- END GENERATED RESULTS -->
 
