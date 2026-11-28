@@ -1,5 +1,5 @@
 {
-  "question": "do detectors fit and thresholded on InTAS highway 2 keep their performance on an independently simulated scenario of the same release?",
+  "question": "do detectors fit and thresholded on InTAS highway 2 keep their performance on InTAS urban 2, a different geographic area of the same InTAS simulation setup in the same release?",
   "status": "EVALUABLE",
   "training_scenario": "InTAS_highway_2",
   "heldout_scenario": "InTAS_urban_2",

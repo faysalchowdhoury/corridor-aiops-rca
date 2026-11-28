@@ -19122,7 +19122,7 @@
     }
   },
   "label_granularity": {
-    "definition": "VeReMi NextGen assigns attacker labels at sender level during attack windows. message_corroborated: attacker records whose payload diverges from the official ground truth (dataReplay) or that have no ground-truth broadcast (dosAttack injected); sender_level_genuine_state: dosAttack attacker records whose payload equals the genuine sender state, which a detector can flag only through window context such as timing, not through payload falsification. AUROC compares each group with all non-malicious test records of the same context.",
+    "definition": "The VeReMi NextGen paper defines the attacker flag per message as a significant deviation of at least one attribute; the ground-truth audit compares position and speed only. message_corroborated: attacker records whose position or speed diverges from the official ground truth (dataReplay) or that have no ground-truth broadcast (dosAttack injected); sender_level_genuine_state (legacy key name, kept for compatibility): dosAttack attacker records whose position and speed match their ground-truth broadcast, so a detector cannot flag them through falsified position or speed. AUROC compares each group with all non-malicious test records of the same context.",
     "contexts": {
       "official": {
         "protocol": "pooled official models on the full official test split with their pooled validation-F1 thresholds",

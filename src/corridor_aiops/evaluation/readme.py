@@ -99,8 +99,9 @@ def render(results: Path) -> str:
             f"{_count(totals.get('dosAttack:attacker_1_no_ground_truth_broadcast', 0))} "
             "`dosAttack` records by the absence of a ground-truth broadcast, and "
             f"{_count(totals.get('dosAttack:attacker_1_payload_matches', 0))} `dosAttack` "
-            "records match the genuine sender state and remain uncorroborated (sender-level "
-            "labels). This is a consistency audit, not independent label validation."
+            "records match their ground-truth broadcast in position and speed and remain "
+            "uncorroborated (the audit compares only these fields). This is a consistency "
+            "audit, not independent label validation."
         )
 
     boot = summary["uncertainty"]["sender_cluster_bootstrap"]
@@ -228,13 +229,14 @@ def render(results: Path) -> str:
                 for n in supervised
             ]
             bullets.append(
-                "**Message-corroborated versus sender-level labels:** "
+                "**Message-corroborated versus state-matching attacker records:** "
                 f"{_count(official['group_counts']['message_corroborated'])} official test "
-                "attacker records are corroborated by their payload and "
-                f"{_count(official['group_counts']['sender_level_genuine_state'])} carry the "
-                "genuine sender state and are labeled at sender level; supervised recall on the "
-                f"sender-level group is {min(sender_level):.3f} to {max(sender_level):.3f}, "
-                "obtained from window context rather than payload falsification."
+                "attacker records diverge from the ground truth in position or speed or have no "
+                "ground-truth broadcast, and "
+                f"{_count(official['group_counts']['sender_level_genuine_state'])} match it in "
+                "position and speed; supervised recall on the state-matching group is "
+                f"{min(sender_level):.3f} to {max(sender_level):.3f}, which cannot reflect "
+                "falsified position or speed."
             )
 
     sensitivity_block = _load(results, "seed_bootstrap_sensitivity.json")

@@ -1,4 +1,4 @@
-"""Held-out scenario evaluation on an independently simulated VeReMi NextGen scenario.
+"""Held-out scenario evaluation on a different area of the same VeReMi NextGen InTAS setup.
 
 Every model is fit, normalized, checkpoint-selected, and thresholded on the InTAS
 highway 2 official train and validation splits exactly as in the main benchmark, then
@@ -218,7 +218,8 @@ def run_heldout(
     result = {
         "question": (
             "do detectors fit and thresholded on InTAS highway 2 keep their performance on "
-            "an independently simulated scenario of the same release?"
+            "InTAS urban 2, a different geographic area of the same InTAS simulation setup "
+            "in the same release?"
         ),
         "status": "EVALUABLE",
         "training_scenario": main_scenario,

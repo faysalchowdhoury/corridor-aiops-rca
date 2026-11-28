@@ -30,12 +30,6 @@ def _inline_inputs(text: str, base: Path) -> str:
     return re.sub(r"\\input\{([^}]+)\}", replace, text)
 
 
-ROMAN = (
-    "I", "II", "III", "IV", "V", "VI", "VII", "VIII",
-    "IX", "X", "XI", "XII", "XIII", "XIV", "XV", "XVI",
-)
-
-
 def _closing_brace(text: str, opening: int) -> int:
     """Index of the brace that closes the group opened at ``text[opening]``."""
     depth = 0
@@ -50,19 +44,19 @@ def _closing_brace(text: str, opening: int) -> int:
 
 
 def _number_floats(tex: str) -> str:
-    """Number tables (Roman) and figures (Arabic) as IEEEtran does, and resolve refs."""
+    """Number tables and figures as elsarticle does, and resolve refs."""
     numbers: dict[str, str] = {}
     counters = {"table": 0, "figure": 0}
 
     def number(match: re.Match[str]) -> str:
         environment, body = match.group(1), match.group(2)
-        kind = environment.rstrip("*")
+        kind = "table" if "table" in environment else "figure"
         counters[kind] += 1
         count = counters[kind]
-        tag = f"TABLE {ROMAN[count - 1]}." if kind == "table" else f"Fig. {count}."
+        tag = f"Table {count}." if kind == "table" else f"Fig. {count}."
         label = re.search(r"\\label\{([^}]+)\}", body)
         if label:
-            numbers[label.group(1)] = ROMAN[count - 1] if kind == "table" else str(count)
+            numbers[label.group(1)] = str(count)
         if kind == "table":
             # pandoc drops captions of tabulars nested in size groups, so the caption
             # becomes an explicit paragraph above the table.
@@ -75,11 +69,69 @@ def _number_floats(tex: str) -> str:
         body = body.replace("\\caption{", f"\\caption{{{tag} ", 1)
         return f"\\begin{{{environment}}}{body}\\end{{{environment}}}"
 
-    tex = re.sub(r"\\begin\{(table\*?|figure\*?)\}(.*?)\\end\{\1\}", number, tex, flags=re.S)
+    tex = re.sub(
+        r"\\begin\{(table\*?|sidewaystable|figure\*?)\}(.*?)\\end\{\1\}", number, tex, flags=re.S
+    )
     return re.sub(r"\\ref\{([^}]+)\}", lambda match: numbers.get(match.group(1), "?"), tex)
 
 
+def _braced(text: str, start: int) -> tuple[str, int]:
+    """Content of the brace group opening at ``text[start]`` and the index after it."""
+    end = _closing_brace(text, start)
+    return text[start + 1 : end], end + 1
+
+
+def _frontmatter(tex: str) -> str:
+    """Rewrite the elsarticle front matter into commands pandoc understands."""
+    tex = re.sub(r"\\corref\{[^}]*\}", "*", tex)
+    affiliations: dict[str, str] = {}
+    while (match := re.search(r"\\affiliation\[([^\]]+)\]", tex)) is not None:
+        content, after = _braced(tex, match.end())
+        fields = dict(re.findall(r"(\w+)=\{((?:[^{}]|\{[^{}]*\})*)\}", content))
+        parts = [fields.get(key, "") for key in ("organization", "city", "state", "country")]
+        affiliations[match.group(1)] = ", ".join(part for part in parts if part)
+        tex = tex[: match.start()] + tex[after:].lstrip("\n")
+    authors = []
+    while (match := re.search(r"\\author\[([^\]]+)\]", tex)) is not None:
+        name, after = _braced(tex, match.end())
+        authors.append(f"{name} ({affiliations.get(match.group(1), '')})")
+        tex = tex[: match.start()] + tex[after:].lstrip("\n")
+    emails = []
+    for command in ("ead", "cortext", "journal"):
+        while (match := re.search(rf"\\{command}(\[[^\]]*\])?(?=\{{)", tex)) is not None:
+            content, after = _braced(tex, match.end())
+            if command == "ead":
+                emails.append(content)
+            tex = tex[: match.start()] + tex[after:].lstrip("\n")
+    if authors:
+        note = f" \\and *Corresponding author: {', '.join(emails)}" if emails else ""
+        names = " \\and ".join(authors)
+        title_end = tex.index("\\begin{abstract}")
+        tex = tex[:title_end] + f"\\author{{{names}{note}}}\n\n" + tex[title_end:]
+    tex = re.sub(r"\\(begin|end)\{frontmatter\}\n", "", tex)
+    tex = re.sub(
+        r"\\begin\{highlights\}(.*?)\\end\{highlights\}",
+        r"\\noindent\\textbf{Highlights}\n\\begin{itemize}\1\\end{itemize}",
+        tex,
+        flags=re.S,
+    )
+    return re.sub(
+        r"\\begin\{keyword\}\s*(.*?)\s*\\end\{keyword\}",
+        lambda match: "\\noindent\\textbf{Keywords:} " + match.group(1).replace(" \\sep ", "; "),
+        tex,
+        flags=re.S,
+    )
+
+
 def _prepare(tex: str) -> str:
+    tex = _frontmatter(tex)
+    tex = re.sub(r"\\(begin\{adjustbox\}\{[^}]*\}|end\{adjustbox\})\n?", "", tex)
+    tex = tex.replace(">{\\raggedright\\arraybackslash}", "")
+    tex = re.sub(
+        r"\*\{(\d+)\}\{(p\{[^}]*\})\}",
+        lambda match: match.group(2) * int(match.group(1)),
+        tex,
+    )
     tex = re.sub(r"\\makeatletter.*?\\makeatother\n", "", tex, flags=re.S)
     tex = tex.replace("\\bstctlcite{NoRepeatedAuthorDash}\n", "")
     tex = re.sub(r"(figures/[A-Za-z0-9_]+)\.pdf", r"\1.png", tex)

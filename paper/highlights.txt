@@ -1,0 +1,4 @@
+Sender-clustered bootstrap, repeated per training seed, on VeReMi NextGen traces
+Tree ensembles exceed a Tabular Transformer for every training seed
+Detectors trained on one attack archive mis-rank attackers in the other
+Validation-calibrated thresholds overshoot false-alarm budgets on test data

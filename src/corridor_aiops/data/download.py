@@ -26,8 +26,9 @@ VEREMI_FILES = (
     "InTAS_highway_2_Validation_groundTruth.json",
     "InTAS_highway_2_Test_ground_truth.json",
 )
-# Independently simulated InTAS scenario in the same Zenodo record, used only as a
-# held-out test scenario (no fitting, normalization, or threshold selection on it).
+# A different geographic area of the same InTAS simulation setup, published in the same
+# Zenodo record and used only as a held-out test scenario (no fitting, normalization, or
+# threshold selection on it).
 # Only the official test split is used, so only its ground-truth file is acquired.
 HELDOUT_SCENARIO = "InTAS_urban_2"
 HELDOUT_VEREMI_FILES = (

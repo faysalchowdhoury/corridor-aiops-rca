@@ -1,20 +1,24 @@
 # CorridorAIOps-RCA
 
-**Author:** Faysal A. Chowdhoury
+**Repository author:** Faysal A. Chowdhoury
 
 **Repository:** [faysalchowdhoury/corridor-aiops-rca](https://github.com/faysalchowdhoury/corridor-aiops-rca)
 
-**Manuscript:** *Attack-Specific Misbehavior Detection in Connected-Vehicle Networks: A Sender-Clustered Evaluation of Cross-Attack Generalization* ([paper/main.tex](paper/main.tex))
+**Manuscript:** *Attack-Specific Misbehavior Detection in Connected-Vehicle Networks: A Sender-Clustered Evaluation of Cross-Attack Generalization*, by Faysal A. Chowdhoury and Lu Sun ([paper/main.tex](paper/main.tex), Elsevier `elsarticle` format)
 
-> **Scope.** This repository is an **evidence-bounded evaluation benchmark for simulated V2X misbehavior detection**. It is **not** a validated corridor-level AIOps system and **not** a causal root-cause analysis (RCA) system. The held-out scenario `InTAS_urban_2` tests cross-network transfer within the same VeReMi NextGen and InTAS simulator ecosystem; it is not external real-world validation.
+> **Scope.** This repository is an **evidence-bounded evaluation benchmark for simulated, attacker-labeled V2X attack detection**. It is **not** a validated corridor-level AIOps system and **not** a causal root-cause analysis (RCA) system. The held-out scenario `InTAS_urban_2` is a different area of the same InTAS simulation setup (Hermann et al., VNC 2026) with the same two attack categories, so it tests cross-area transfer; it is not validation on another simulator or on real-world connected-vehicle traffic.
 
 This repository evaluates simulated V2X misbehavior detection on the published VeReMi NextGen InTAS highway 2 traces, with InTAS urban 2 as a held-out test scenario. It uses no traffic-physics model and does not generate synthetic traffic or attacks. The evidence supports simulated message-level misbehavior detection for the two evaluated attack categories (`dataReplay` and `dosAttack`) and retrospective sender ranking only. It does **not** support field deployment readiness, corridor-level operations analytics, causal root-cause analysis (RCA), work-zone false-alarm rates, cross-modal fusion, or production latency claims. The repository name predates this scope.
 
 Features are **past-only (temporally causal)**: each window uses only the current and earlier messages of a sender, which prevents future leakage. This is not causal inference or causal root-cause discovery.
 
-**Labels.** VeReMi NextGen assigns attacker labels at sender level during attack windows. `dosAttack` records whose payload equals the genuine sender state therefore test whether a detector flags an attacker's normal beacons through window context (for example, flood timing), not payload falsification. Results are reported separately for message-corroborated and sender-level-labeled attacker records.
+**Labels.** The VeReMi NextGen paper (Hermann et al., VNC 2026) defines the per-message attacker flag as a significant deviation of at least one message attribute from its original value. The ground-truth audit compares position and speed only. Some `dosAttack` attacker records match their ground-truth broadcast in both, so their detection cannot be attributed to falsified position or speed; window context such as flood timing is a plausible basis. Results are reported separately for message-corroborated and these state-matching attacker records. In `results/loao_diagnostics.json` this group keeps the legacy key `sender_level_genuine_state` for compatibility with existing consumers; the key name does not mean that the dataset labels whole senders.
 
-**Timing.** `inference_ms_per_event` measures in-memory model scoring throughput on pre-extracted feature tensors only. It excludes streaming ingestion, window extraction, queueing delay, and any production service-level claim.
+**Generalization.** Three evaluations are reported separately: a sender-disjoint holdout (unseen senders within pooled time), a chronological holdout (later time, with sender overlap retained, so it is not sender-independent), and transfer to `InTAS_urban_2` (same simulator ecosystem, same `dataReplay` and `dosAttack` categories). Each evaluated archive holds exactly one attack category, so leave-one-attack-type-out transfer varies attack semantics and archive-specific simulation-generation effects together. The reversed kinematic signatures are observations in these traces; they help explain the archive-to-archive transfer failure but do not establish a mechanism for other attack implementations.
+
+**Timing.** `inference_ms_per_event` measures in-memory model scoring on pre-extracted feature tensors only. It excludes ingestion, feature extraction, queueing, and end-to-end production latency, and supports no production service-level claim.
+
+**Operating points.** The 1% and 5% test ROC markers are retrospective curve diagnostics. Validation-calibrated recall and the realized test false-alarm rate are the operationally relevant quantities.
 
 ## Evidence status
 
@@ -42,7 +46,7 @@ Features are **past-only (temporally causal)**: each window uses only the curren
 | Matched L = 10 one-class controls | isolation forest and one-class SVM on the flattened L = 10 window | `one_class_window_length` in `results/ablation_summary.json` |
 | Label-free autoencoder checkpoint | main `lstm_autoencoder` is `benign_only_training_with_validation_auroc_selection`; control `lstm_autoencoder_unsupervised_ckpt` selects on benign validation reconstruction error only | `autoencoder_checkpoint_selection` in `results/ablation_summary.json` |
 | Seen versus unseen official test senders | official test split divided by whether the sender occurs in the official training split; all evaluated models, also on the sender-disjoint holdout | `sender_overlap` in `results/loao_diagnostics.json`, `results/results_sender_overlap.tex` |
-| Message-corroborated versus sender-level labels | all evaluated models, pooled official test and LOAO | `label_granularity` in `results/loao_diagnostics.json`, `results/results_loao_subgroups.tex` |
+| Message-corroborated versus state-matching attacker records | all evaluated models, pooled official test and LOAO | `label_granularity` in `results/loao_diagnostics.json`, `results/results_loao_subgroups.tex` |
 | Seed-level effect sizes | mean paired differences, fraction of bootstrap replicates favoring the reference, standardized d_z | `effect_size` in `results/seed_bootstrap_sensitivity.json` |
 | Determinism and leakage tests | timestamp-tie permutation invariance, no future influence, earliest receiver copy, source-only normalization and thresholds | `tests/test_p0_regressions.py` |
 | Second-run reproduction | measured comparison, not assumed | `results/reproduction_audit.json` |
@@ -58,7 +62,7 @@ The separately published VeReMi ground-truth files contain the genuine sender st
 2. every `attacker = 0` record exists in the same split's ground truth with matching sender position and speed;
 3. where a ground-truth record carries an `attacker` field, it equals the embedded label.
 
-Attacker records are corroborated by state divergence (`dataReplay`), corroborated by the absence of a ground-truth broadcast (`dosAttack` injected messages), or uncorroborated because their payload matches the genuine sender state (`dosAttack` genuine-state beacons labeled at sender level). The counts are in the generated results below and in `results/dataset_capability_matrix.json`.
+Attacker records are corroborated by state divergence (`dataReplay`), corroborated by the absence of a ground-truth broadcast (`dosAttack` injected messages), or uncorroborated because their position and speed match the ground-truth broadcast (`dosAttack` state-matching records; the audit does not compare other attributes). The counts are in the generated results below and in `results/dataset_capability_matrix.json`.
 
 ### Composite sender clusters
 
@@ -85,7 +89,7 @@ Both archives replay the same InTAS vehicle population, so every test `source_id
 
 Values are mean ± sample standard deviation (or seed means) over training seeds. The primary operational metric is validation-calibrated recall with its realized test false-alarm rate; the test ROC TPR at 1% FPR places the threshold with test scores and is a retrospective curve diagnostic, not an achievable operating point.
 
-* **Official ground-truth consistency audit:** 18,496 `dataReplay` attacker records are corroborated by state divergence, 42,192 `dosAttack` records by the absence of a ground-truth broadcast, and 20,140 `dosAttack` records match the genuine sender state and remain uncorroborated (sender-level labels). This is a consistency audit, not independent label validation.
+* **Official ground-truth consistency audit:** 18,496 `dataReplay` attacker records are corroborated by state divergence, 42,192 `dosAttack` records by the absence of a ground-truth broadcast, and 20,140 `dosAttack` records match their ground-truth broadcast in position and speed and remain uncorroborated (the audit compares only these fields). This is a consistency audit, not independent label validation.
 * **Composite sender-cluster bootstrap** (first training seed; 1,000 of 1,000 valid replicates, 952 clusters): Random forest and Hist. gradient boosting beat the Tabular Transformer with paired ΔF1 and ΔAUROC 95% intervals below zero.
 * **Per-seed bootstrap sensitivity:** repeating the bootstrap for each training seed, 13 of 16 paired verdicts are stable across seeds. Bootstrap replicates are resamples of one set of test senders, not independent experiments.
 * **Leave-one-attack-type-out:** supervised AUROC is below 0.5 in 6 of 10 model and direction pairs (lowest: Hist. gradient boosting 0.280, `dataReplay->dosAttack`). The detectors are attack-specific, not attack-general.
@@ -94,7 +98,7 @@ Values are mean ± sample standard deviation (or seed means) over training seeds
 * **Why LOAO fails:** Horizontal displacement, speed change, and heading change mark attackers in opposite directions in the two attacks; non-malicious traffic does not shift between archives (cross-archive AUROC 0.476 to 0.508).
 * **Threshold procedures:** relative to validation max-F1, Youden's J raises the test false-alarm rate for every seed in 4 of 5 supervised detectors; FAR-budget quantile thresholds are compared in `results/results_threshold_procedures.tex`.
 * **Seen versus unseen senders:** 360 official test senders also occur in the official training split and 592 do not, so official-split scores are not sender-independent; supervised AUROC on seen minus unseen senders ranges from -0.001 to +0.006 (`results/results_sender_overlap.tex`).
-* **Message-corroborated versus sender-level labels:** 10,674 official test attacker records are corroborated by their payload and 3,599 carry the genuine sender state and are labeled at sender level; supervised recall on the sender-level group is 0.960 to 0.967, obtained from window context rather than payload falsification.
+* **Message-corroborated versus state-matching attacker records:** 10,674 official test attacker records diverge from the ground truth in position or speed or have no ground-truth broadcast, and 3,599 match it in position and speed; supervised recall on the state-matching group is 0.960 to 0.967, which cannot reflect falsified position or speed.
 * **Effect sizes:** Tabular Transformer minus random forest AUROC averages -0.003 over seeds (d_z -3.1); the fraction of bootstrap replicates favoring the Transformer averages 0.00. Percentile cluster-bootstrap intervals on imbalanced clustered data and 5-seed effect sizes are approximate.
 * **Sender-disjoint holdout:** supervised AUROC 0.992 to 0.996.
 * **Chronological holdout:** supervised AUROC 0.988 to 0.996.
@@ -178,7 +182,7 @@ The full benchmark (5 seeds, all generalization contexts and ablations) runs on 
 * `src/corridor_aiops/sim_bridge/`: read-only Vissim, SUMO, and CARLA/ROS 2 adapters (no live simulator integration is claimed).
 * `src/corridor_aiops/models/`: baselines, masked LSTM autoencoder, Tabular Transformer, and architecture-only CorridorLogTransformer (with padding and causal attention masks), StaticGCN, and AsyncSTGNN.
 * `src/corridor_aiops/evaluation/`: benchmark, sensitivity and LOAO diagnostics, held-out scenario, LaTeX tables and macros, figures, reproduction and clean-checkout audits, and the README results generator.
-* `paper/`: IEEEtran manuscript and bibliography.
+* `paper/`: Elsevier `elsarticle` manuscript, highlights, bibliography, and DOCX build script.
 
 ## Paper-writing standard
 

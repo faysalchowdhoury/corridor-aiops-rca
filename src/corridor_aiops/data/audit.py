@@ -254,7 +254,7 @@ NOT_ACQUIRED_SCENARIOS = ("InTAS_highway_7", "InTAS_urban_7")
 
 
 def heldout_scenario_status(raw_dir: Path) -> dict[str, Any]:
-    """Status of the independently simulated held-out scenario for both result files.
+    """Status of the held-out scenario (another area of the same InTAS setup) in result files.
 
     EVALUABLE when the checksum-verified held-out manifest written by
     ``corridor-ingest --heldout-only`` lists archives that are present on disk.

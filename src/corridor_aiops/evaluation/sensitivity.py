@@ -101,10 +101,13 @@ SUBGROUP_TAGS = {
     "attacker_no_ground_truth": "Injected",
     "attacker_payload_matches": "Genuine",
 }
-# VeReMi NextGen labels attackers at sender level during attack windows. Records whose
-# payload the official ground truth contradicts (replay divergence) or lacks (injected
-# flood messages) are message-corroborated; dosAttack records whose payload equals the
-# genuine sender state are labeled only because their sender is the attacker.
+# The VeReMi NextGen paper (Hermann et al., VNC 2026) defines the attacker flag per message as
+# a significant deviation of at least one attribute; the ground-truth audit compares position
+# and speed only. Records whose position or speed the official ground truth contradicts
+# (replay divergence) or that it lacks (injected flood messages) are message-corroborated;
+# dosAttack records whose position and speed match the ground truth are state-matching.
+# The key "sender_level_genuine_state" is a legacy name kept for compatibility with existing
+# result files and consumers; it does not mean that the dataset labels whole senders.
 LABEL_GRANULARITY_GROUPS = {
     "message_corroborated": ("attacker_payload_differs", "attacker_no_ground_truth"),
     "sender_level_genuine_state": ("attacker_payload_matches",),
@@ -556,7 +559,7 @@ def _group_metrics(
 def label_granularity_breakdown(
     table: EventTable, summary: dict[str, Any], scores: _Scores, outcomes: np.ndarray
 ) -> dict[str, Any]:
-    """Message-corroborated versus sender-level-labeled attacker records, all models."""
+    """Message-corroborated versus state-matching attacker records, all models."""
     seeds = list(summary["protocol"]["training_seeds"])
     labels = table.labels
     contexts: dict[str, Any] = {}
@@ -599,13 +602,15 @@ def label_granularity_breakdown(
         contexts[name_key] = block
     return {
         "definition": (
-            "VeReMi NextGen assigns attacker labels at sender level during attack windows. "
-            "message_corroborated: attacker records whose payload diverges from the official "
-            "ground truth (dataReplay) or that have no ground-truth broadcast (dosAttack "
-            "injected); sender_level_genuine_state: dosAttack attacker records whose payload "
-            "equals the genuine sender state, which a detector can flag only through window "
-            "context such as timing, not through payload falsification. AUROC compares each "
-            "group with all non-malicious test records of the same context."
+            "The VeReMi NextGen paper defines the attacker flag per message as a significant "
+            "deviation of at least one attribute; the ground-truth audit compares position "
+            "and speed only. message_corroborated: attacker records whose position or speed "
+            "diverges from the official ground truth (dataReplay) or that have no "
+            "ground-truth broadcast (dosAttack injected); sender_level_genuine_state (legacy "
+            "key name, kept for compatibility): dosAttack attacker records whose position and "
+            "speed match their ground-truth broadcast, so a detector cannot flag them through "
+            "falsified position or speed. AUROC compares each group with all non-malicious "
+            "test records of the same context."
         ),
         "contexts": contexts,
     }
@@ -1271,7 +1276,7 @@ def _label_granularity_table(summary: dict[str, Any], diagnostics: dict[str, Any
         "\\cmidrule(lr){2-5}\\cmidrule(lr){6-9}",
         "& "
         + " & ".join(
-            "\\multicolumn{2}{c}{Message-corroborated} & \\multicolumn{2}{c}{Sender-level}"
+            "\\multicolumn{2}{c}{Message-corroborated} & \\multicolumn{2}{c}{State-matching}"
             for _ in contexts
         )
         + " \\\\",
