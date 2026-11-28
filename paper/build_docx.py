@@ -82,32 +82,48 @@ def _braced(text: str, start: int) -> tuple[str, int]:
 
 
 def _frontmatter(tex: str) -> str:
-    """Rewrite the elsarticle front matter into commands pandoc understands."""
-    tex = re.sub(r"\\corref\{[^}]*\}", "*", tex)
-    affiliations: dict[str, str] = {}
+    """Rewrite the elsarticle front matter into commands pandoc understands.
+
+    Authors carry numeric affiliation marks (and * for the corresponding author), and the
+    numbered affiliations and the correspondence note follow them, as in the PDF header.
+    """
+    affiliations: dict[str, tuple[int, str]] = {}
     while (match := re.search(r"\\affiliation\[([^\]]+)\]", tex)) is not None:
         content, after = _braced(tex, match.end())
         fields = dict(re.findall(r"(\w+)=\{((?:[^{}]|\{[^{}]*\})*)\}", content))
-        parts = [fields.get(key, "") for key in ("organization", "city", "state", "country")]
-        affiliations[match.group(1)] = ", ".join(part for part in parts if part)
+        place = " ".join(fields[key] for key in ("state", "postcode") if fields.get(key))
+        parts = [fields.get("organization"), fields.get("addressline"), fields.get("city"), place]
+        parts.append(fields.get("country"))
+        text = ", ".join(part for part in parts if part)
+        affiliations[match.group(1)] = (len(affiliations) + 1, text)
         tex = tex[: match.start()] + tex[after:].lstrip("\n")
     authors = []
     while (match := re.search(r"\\author\[([^\]]+)\]", tex)) is not None:
         name, after = _braced(tex, match.end())
-        authors.append(f"{name} ({affiliations.get(match.group(1), '')})")
+        keys = [key for key in match.group(1).split(",") if key in affiliations]
+        marks = [str(affiliations[key][0]) for key in keys]
+        if "\\corref" in name:
+            marks.append("*")
+        name = re.sub(r"\\corref\{[^}]*\}", "", name).strip()
+        authors.append(f"{name}\\textsuperscript{{{','.join(marks)}}}")
         tex = tex[: match.start()] + tex[after:].lstrip("\n")
-    emails = []
+    notes = []
     for command in ("ead", "cortext", "journal"):
         while (match := re.search(rf"\\{command}(\[[^\]]*\])?(?=\{{)", tex)) is not None:
             content, after = _braced(tex, match.end())
-            if command == "ead":
-                emails.append(content)
+            if command == "cortext":
+                notes.append(f"\\textsuperscript{{*}}{content}")
+            elif command == "ead":
+                notes.append(f"Email: {content}")
             tex = tex[: match.start()] + tex[after:].lstrip("\n")
     if authors:
-        note = f" \\and *Corresponding author: {', '.join(emails)}" if emails else ""
-        names = " \\and ".join(authors)
+        lines = authors + [
+            f"\\textsuperscript{{{number}}}{text}"
+            for number, text in sorted(affiliations.values())
+        ]
+        header = " \\and ".join(lines + notes)
         title_end = tex.index("\\begin{abstract}")
-        tex = tex[:title_end] + f"\\author{{{names}{note}}}\n\n" + tex[title_end:]
+        tex = tex[:title_end] + f"\\author{{{header}}}\n\n" + tex[title_end:]
     tex = re.sub(r"\\(begin|end)\{frontmatter\}\n", "", tex)
     tex = re.sub(
         r"\\begin\{highlights\}(.*?)\\end\{highlights\}",
@@ -125,6 +141,11 @@ def _frontmatter(tex: str) -> str:
 
 def _prepare(tex: str) -> str:
     tex = _frontmatter(tex)
+    # Page geometry and column-width helpers apply to the PDF only; Word lays out the table.
+    tex = re.sub(r"\\(newgeometry\{[^}]*\}|restoregeometry)\n?", "", tex)
+    tex = re.sub(r"\\setlength\{\\relatedcolw\}\{[^\n]*\}\n", "", tex)
+    tex = re.sub(r"\\renewcommand\{\\arraystretch\}\{[^}]*\}", "", tex)
+    tex = tex.replace("\\relatedcolw", "\\textwidth")
     tex = re.sub(r"\\(begin\{adjustbox\}\{[^}]*\}|end\{adjustbox\})\n?", "", tex)
     tex = tex.replace(">{\\raggedright\\arraybackslash}", "")
     tex = re.sub(

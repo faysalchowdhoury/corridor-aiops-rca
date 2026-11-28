@@ -1,4 +1,4 @@
-\documentclass[preprint,12pt]{elsarticle}
+\documentclass[preprint,12pt,numafflabel]{elsarticle}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{url}
@@ -7,6 +7,10 @@
 \usepackage{adjustbox}
 \usepackage{array}
 \usepackage{rotating}
+% "pass" leaves the elsarticle page layout unchanged; \newgeometry is used only around
+% the rotated related-work table page.
+\usepackage[pass]{geometry}
+\newlength{\relatedcolw}
 \usepackage[hidelinks]{hyperref}
 \usepackage{xurl}
 
@@ -38,15 +42,22 @@
 
 \title{Attack-Specific Misbehavior Detection in Connected-Vehicle Networks: A Sender-Clustered Evaluation of Cross-Attack Generalization}
 
-\author[cet]{Faysal A. Chowdhoury}
-\author[cet]{Lu Sun\corref{cor1}}
-\ead{lxsite@rit.edu}
-\cortext[cor1]{Corresponding author.}
+\author[1]{Faysal A. Chowdhoury\corref{cor1}}
+\author[2]{Lu Sun}
+\cortext[cor1]{Correspondence: smcite@rit.edu}
 
-\affiliation[cet]{organization={Department of Civil Engineering Technology, Environmental Management and Safety, Rochester Institute of Technology},
+\affiliation[1]{organization={Department of Civil Engineering Technology, Environmental Management and Safety, Rochester Institute of Technology},
+            addressline={78 Lomb Memorial Dr.},
             city={Rochester},
             state={NY},
-            country={USA}}
+            postcode={14623},
+            country={USA; smcite@rit.edu}}
+\affiliation[2]{organization={Center for Cognitive Science, Personalized Health Technology Research Center of Excellence, Department of Computing and Information Sciences, Department of Civil Engineering Technology, Environmental Management and Safety, Rochester Institute of Technology},
+            addressline={78 Lomb Memorial Dr.},
+            city={Rochester},
+            state={NY},
+            postcode={14623},
+            country={USA; lxsite@rit.edu}}
 
 \begin{abstract}
 We evaluate simulated, attacker-labeled V2X attack detection on the official VeReMi NextGen InTAS highway 2 splits for data replay and denial of service. This evidence-bounded evaluation benchmark is not a validated AIOps or root-cause analysis system. A ground-truth consistency audit corroborates \ResAuditReplayDiffers{} replay records by payload divergence and \ResAuditDoSNoGT{} injected flood records by a missing ground-truth broadcast. Another \ResAuditDoSMatches{} attacker-labeled flood records match the ground truth in position and speed, so detecting them cannot be attributed to falsified position or speed. Four unsupervised or one-class and five supervised detectors use past-only windows and \ResSeeds{} training seeds; a composite (corridor, sender) cluster bootstrap is repeated per seed. Supervised mean AUROC lies between \ResSupAUROCMin{} and \ResSupAUROCMax. Random forest and gradient boosting exceed the Tabular Transformer for every seed, while its margins over logistic regression and the MLP vary by seed. Validation thresholds for a 1\% false-alarm budget give supervised recall of \ResSupCalRecallMin{} to \ResSupCalRecallMax{} at realized test false-alarm rates of \ResSupCalFARMin\% to \ResSupCalFARMax\%. Ranking holds in three separate evaluations: unseen senders within pooled time, a chronological holdout that retains sender overlap, and transfer to the InTAS urban area under the same simulation setup and attacks. It fails between the two attack archives. Supervised detectors rank attackers below non-malicious messages in \ResStdBelowHalf{} of \ResDedupSupPairs{} leave-one-attack-type-out tests and in \ResDedupBelowHalf{} after sender-disjoint deduplication. Because each archive holds one attack category, attack semantics and archive-specific generation effects vary together. Partly reversed kinematic signatures in these traces help explain the failure but establish no general mechanism.
@@ -88,12 +99,16 @@ The VeReMi NextGen paper \cite{hermann2026veremi} establishes the dataset contri
 
 Table~\ref{tab:related} compares these resources with the present study on six properties. VeReMi and its Extension are datasets, F2MD is a simulation framework rather than a dataset, and the study of So et al.\ is an empirical detector study on VeReMi. Not reported means that the full text we read does not document a property. Not verified means that we could read only the abstract or part of a publication and therefore cannot tell whether the property is documented. Neither marker implies that the corresponding experiment was not performed. Read this way, the table locates the contribution of this paper in its evaluation design. That design measures sender overlap and adds sender-disjoint and deduplicated controls. It reports training-seed and sender-cluster uncertainty separately and tests transfer between attack archives and to another area. A ground-truth audit separates payload-corroborated attacker records from records whose position and speed match the ground truth. It does not show that earlier studies lacked these properties, and this paper introduces no dataset, framework, or detector.
 
+\newgeometry{margin=0.6in}
+% Seven columns whose widths plus 14 x 3.5pt column separation sum to 0.98 of the rotated
+% width (the landscape text width is \textheight).
+\setlength{\relatedcolw}{\dimexpr 0.98\textheight - 49pt\relax}
 \begin{sidewaystable}
 \centering
 \caption{Representative VeReMi-family resources and studies compared with the present study. Entries for VeReMi NextGen come from its full paper and Zenodo record. Entries for So et al., the VeReMi Extension, and F2MD come from their published abstracts, and entries for VeReMi from part of its full text (arXiv version). $^\dagger$Statement made about a predecessor dataset in the VeReMi NextGen paper \cite{hermann2026veremi}. Not reported: the full text we read does not document the property. Not verified: we could read only the abstract or part of the publication, so we cannot tell whether the property is documented. Neither marker implies that an experiment was not performed.}
 \label{tab:related}
-{\scriptsize\setlength{\tabcolsep}{3pt}
-\begin{tabular}{*{7}{>{\raggedright\arraybackslash}p{0.125\textwidth}}}
+{\scriptsize\setlength{\tabcolsep}{3.5pt}\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.09\relatedcolw}>{\raggedright\arraybackslash}p{0.12\relatedcolw}>{\raggedright\arraybackslash}p{0.20\relatedcolw}>{\raggedright\arraybackslash}p{0.16\relatedcolw}>{\raggedright\arraybackslash}p{0.12\relatedcolw}>{\raggedright\arraybackslash}p{0.14\relatedcolw}>{\raggedright\arraybackslash}p{0.17\relatedcolw}}
 \toprule
 Study & Role & Data and attacks & Split and sender overlap & Seeds and uncertainty & Cross-attack and scenario transfer & Ground truth and operating points \\
 \midrule
@@ -106,6 +121,7 @@ This study & Empirical evaluation; no new dataset, framework, or detector & InTA
 \bottomrule
 \end{tabular}}
 \end{sidewaystable}
+\restoregeometry
 
 These resources standardize data and simulation, but they leave the evaluation protocol to each study, and three weaknesses recur. First, messages from one sender are strongly dependent, so per-message resampling understates uncertainty. Second, detectors are commonly trained and tested on the same attack catalog, which does not show whether a detector recognizes an attack it has not seen. Third, VeReMi NextGen integrates every attack into one shared baseline simulation during post-processing \cite{hermann2026veremi}, so its attack subsets replay one vehicle population. The same senders and, as we show, identical non-malicious messages then appear in several subsets, so transfer results can mix attack generalization with sender or message familiarity. This paper does not propose a new detector. It contributes an evaluation protocol on VeReMi NextGen that addresses each weakness: a composite sender-cluster bootstrap repeated for every training seed, LOAO tests with a sender-disjoint deduplicated variant, and sender-disjoint, chronological, and held-out-scenario controls.
 
